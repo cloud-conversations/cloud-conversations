@@ -1,0 +1,94 @@
+x-service: &service
+  build: .
+  environment:
+    DATABASE_URL: postgresql://dev:dev@db:5432/cloudconversations
+    CC_BROKER_URL: redis://redis:6379/0
+    CC_LLM_BASE_URL: ${CC_LLM_BASE_URL:-}
+    CC_LLM_API_KEY: ${CC_LLM_API_KEY:-}
+    CC_LLM_MODEL: ${CC_LLM_MODEL:-}
+    CC_LLM_TEMPERATURE:
+    CC_LOG_LEVEL: ${CC_LOG_LEVEL:-}
+    CC_SECRET_KEY: ${CC_SECRET_KEY:-}
+    CC_OIDC_CHAMELEON_CLIENT_SECRET: ${CC_OIDC_CHAMELEON_CLIENT_SECRET:-}
+    CC_ADMINS: ${CC_ADMINS:-}
+    CC_OIDC_CHAMELEON_ISSUER: ${CC_OIDC_CHAMELEON_ISSUER:-}
+    CC_OIDC_CHAMELEON_CLIENT_ID: ${CC_OIDC_CHAMELEON_CLIENT_ID:-}
+    CC_PUBLIC_URL: ${CC_PUBLIC_URL:-}
+    HF_HOME: /hf
+  volumes:
+    - hf_cache:/hf
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: cloudconversations
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d cloudconversations"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    entrypoint: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql://dev:dev@db:5432/cloudconversations
+      CC_SECRET_KEY: ${CC_SECRET_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *service
+    command: ["api", "--host", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker-chat:
+    <<: *service
+    entrypoint: ["celery", "-A", "cloud_conversations.worker.app", "worker", "-Q", "chat", "-c", "1", "--loglevel", "${CC_LOG_LEVEL:-warning}"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker-runs:
+    <<: *service
+    entrypoint: ["celery", "-A", "cloud_conversations.worker.app", "worker", "-Q", "runs", "-c", "${CC_RUNS_CONCURRENCY:-2}", "--loglevel", "${CC_LOG_LEVEL:-warning}"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
+  hf_cache:

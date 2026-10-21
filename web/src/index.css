@@ -1,0 +1,46 @@
+@import "tailwindcss" source(none);
+@config "../tailwind.config.js";
+
+@custom-variant hover (&:hover);
+
+@theme {
+  --color-orange-500: #f97316;
+}
+
+@layer base {
+  body {
+    @apply bg-grey-lighter text-grey-dark;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    opacity: revert;
+  }
+
+  input,
+  select,
+  textarea {
+    background-color: revert;
+  }
+
+  th,
+  td {
+    padding: 1px;
+  }
+
+  option {
+    padding: revert;
+  }
+}

@@ -1,0 +1,3172 @@
+{
+ "items": [
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 192
+   },
+   "availability": "unknown",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-09-10",
+    "vendor": "Dell",
+    "version": "2.3.5"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge XE9640",
+    "serial": "88PKK44"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 4,
+    "gpu_model": "NVIDIA Corporation",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "1024 GiB",
+    "ram_size": 1099511627776
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "enp203s0np0",
+     "driver": "mlx5_core",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "98:03:9b:c2:26:e4",
+     "model": "MT28908 Family [ConnectX-6]",
+     "rate": 40000000000,
+     "vendor": "Mellanox"
+    },
+    {
+     "device": "eno8303",
+     "driver": "tg3",
+     "enabled": false,
+     "interface": "Ethernet",
+     "mac": "c4:cb:e1:d5:cb:98",
+     "model": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+     "rate": 1000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno8403",
+     "driver": "tg3",
+     "enabled": false,
+     "interface": "Ethernet",
+     "mac": "c4:cb:e1:d5:cb:99",
+     "model": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+     "rate": 1000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno12399np0",
+     "driver": "bnxt_en",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "d4:04:e6:d9:1d:00",
+     "model": "BCM57414 NetXtreme-E 10Gb/25Gb RDMA Ethernet Controller",
+     "rate": 25000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno12409np1",
+     "driver": "bnxt_en",
+     "enabled": false,
+     "interface": "Ethernet",
+     "mac": "d4:04:e6:d9:1d:01",
+     "model": "BCM57414 NetXtreme-E 10Gb/25Gb RDMA Ethernet Controller",
+     "rate": 25000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_mode": "vm_only",
+   "node_name": "kvmgpu01",
+   "node_type": "gpu_h100",
+   "processor": {
+    "cache_l1d": 40960,
+    "cache_l1i": 40960,
+    "cache_l2": 2097152,
+    "cache_l3": 110100480,
+    "clock_speed": 2100000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Platinum 8468",
+    "vendor": "Intel"
+   },
+   "site_id": "kvm",
+   "storage_devices": [
+    {
+     "device": "/dev/nvme1n1",
+     "humanized_size": "3840 GB",
+     "model": "NVMe disk",
+     "size": 3840755982336,
+     "wwn": "895d7dbf-4731-4dde-9854-f6e8c79e3946"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "4c4c4544-0038-5010-804b-b8c04f4b3434"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-02-19",
+    "vendor": "Dell",
+    "version": "2.21.2"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YTV7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:af:e0",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:af:e2",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc40",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "8",
+    "rack": "4"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800360",
+     "size": 240000000000,
+     "wwn": "0x5002538c407781ed"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "b73a5add-2104-4645-95f1-bec85d0c718e"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YWV7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:fd:be",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:fd:c0",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc39",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "7",
+    "rack": "4"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800359",
+     "size": 240000000000,
+     "wwn": "0x5002538c407781ec"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "5b5c7005-b345-4cc1-ae72-83654da15107"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YLX7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:ab:18",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:ab:1a",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc16",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "16",
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800393",
+     "size": 240000000000,
+     "wwn": "0x5002538c4077820e"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "32866b85-6ae1-4433-8561-1919a0b28712"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 80
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2019-11-26",
+    "vendor": "Dell",
+    "version": "2.4.8"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge C4140",
+    "serial": "3J3YN23"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 4,
+    "gpu_model": "GV100GL [Tesla V100 SXM2 32GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "enp94s0f0np0",
+     "driver": "mlx5_core",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "b8:ce:f6:1d:d8:42",
+     "model": "MT27710 Family [ConnectX-4 Lx]",
+     "rate": 25000000000,
+     "vendor": "Mellanox"
+    },
+    {
+     "device": "enp94s0f1np1",
+     "driver": "mlx5_core",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "b8:ce:f6:1d:d8:43",
+     "model": "MT27710 Family [ConnectX-4 Lx]",
+     "rate": 25000000000,
+     "vendor": "Mellanox"
+    }
+   ],
+   "node_name": "P3-GPU-010",
+   "node_type": "gpu_v100",
+   "placement": {
+    "node": "30",
+    "rack": "5"
+   },
+   "processor": {
+    "cache_l1d": 34078,
+    "cache_l1i": 34078,
+    "cache_l2": 1048576,
+    "cache_l3": 28835840,
+    "clock_speed": 2100000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6230 CPU @ 2.10GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sdb",
+     "humanized_size": "240 GB",
+     "interface": "SATA",
+     "media_type": "SSD",
+     "model": "MTFDDAV240TCB",
+     "rev": "D0DE013",
+     "serial": "200125D4C92A",
+     "size": 240000000000,
+     "wwn": "0x500a075125d4c92a"
+    },
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SATA",
+     "media_type": "SSD",
+     "model": "MTFDDAV240TCB",
+     "rev": "D0DE013",
+     "serial": "200125D4CC08",
+     "size": 240000000000,
+     "wwn": "0x500a075125d4cc08"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "99732d8f-3f6c-4602-985a-35aff2657b6c"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YR08M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:fa:06",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:fa:08",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc12",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "12",
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800383",
+     "size": 240000000000,
+     "wwn": "0x5002538c40778204"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "7a3bde6b-ef18-458a-9ec7-0232188d6fc3"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YRZ7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:f5:e8",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7d:f5:ea",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc07",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "7",
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800406",
+     "size": 240000000000,
+     "wwn": "0x5002538c4077821b"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "b71a17ce-fce2-4346-b943-8c49298a06db"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2023-08-28",
+    "vendor": "Dell",
+    "version": "2.11.3 [GigaIO 1.0.0]"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R6525",
+    "serial": "3PHFDX3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "GA100 [A100 PCIe 80GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "512 GiB",
+    "ram_size": 549755813888
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno12399np0",
+     "driver": "bnxt_en",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "14:23:f2:a4:39:50",
+     "model": "BCM57504 NetXtreme-E 10Gb/25Gb/40Gb/50Gb/100Gb/200Gb Ethernet",
+     "rate": 25000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno12409np1",
+     "driver": "bnxt_en",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "14:23:f2:a4:39:51",
+     "model": "BCM57504 NetXtreme-E 10Gb/25Gb/40Gb/50Gb/100Gb/200Gb Ethernet",
+     "rate": 25000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "gigaio-compute-05",
+   "node_type": "compute_gigaio",
+   "placement": {},
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sdb",
+     "humanized_size": "480 GB",
+     "interface": "SATA",
+     "media_type": "SSD",
+     "model": "SSDSCKKB480GZR",
+     "rev": "7CV1DL74",
+     "serial": "PHYK308601FX480B",
+     "size": 480000000000,
+     "wwn": "0x55cd2e415633391a"
+    },
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SATA",
+     "media_type": "SSD",
+     "model": "SSDSCKKB480GZR",
+     "rev": "7CV1DL74",
+     "serial": "PHYK308601JR480B",
+     "size": 480000000000,
+     "wwn": "0x55cd2e4156333972"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "3e2bda13-207a-44bc-a800-0832ac7ebd6a"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YRV7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:11:22",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:11:24",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc11",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "11",
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800403",
+     "size": 240000000000,
+     "wwn": "0x5002538c40778218"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "30a424b3-28a6-44bd-a4a6-d439439e8a09"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-02-19",
+    "vendor": "Dell",
+    "version": "2.21.2"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YQV7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:0f:68",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:0f:6a",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc25",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "25",
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800418",
+     "size": 240000000000,
+     "wwn": "0x5002538c40778227"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "e46f6e1a-38f5-451d-a5ed-3b82a6444fcb"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YLY7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:03:0e",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:03:10",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc05",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "5",
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800417",
+     "size": 240000000000,
+     "wwn": "0x5002538c40778226"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "ff9ebde7-582c-4a75-9ea0-bd3d154c33db"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2024-08-09",
+    "vendor": "Dell",
+    "version": "2.22.1"
+   },
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R740",
+    "serial": "9YPW7M2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "TU102GL [Quadro RTX 6000/8000]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "192 GiB",
+    "ram_size": 206158430208
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:1f:be",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    },
+    {
+     "device": "eno2",
+     "driver": "i40e",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "24:6e:96:7e:1f:c0",
+     "model": "Ethernet Controller X710 for 10GbE SFP+",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "nc33",
+   "node_type": "gpu_rtx_6000",
+   "placement": {
+    "node": "1",
+    "rack": "4"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 1048576,
+    "cache_l3": 20185088,
+    "clock_speed": 2600000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "uc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "240 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7KM240HMHQ0D3",
+     "rev": "GD53",
+     "serial": "S3BSNX0J800407",
+     "size": 240000000000,
+     "wwn": "0x5002538c4077821c"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "8c7b8067-cfa4-49b4-9812-778e78631bf8"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2023-07-26",
+    "vendor": "Dell",
+    "version": "2.12.4"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R6525",
+    "serial": "D764FF3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GA100 [A100 PCIe 40GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "ens2f0",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:ed:4d:dc",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    }
+   ],
+   "node_name": "liqid01",
+   "node_type": "compute_liqid",
+   "placement": {},
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7LH480HBHQ0D3",
+     "rev": "HG58",
+     "serial": "S5YJNA0R540736",
+     "size": 480000000000,
+     "wwn": "0x5002538e0157d26e"
+    },
+    {
+     "device": "nvme0n1",
+     "humanized_size": "3840 GB",
+     "interface": "PCIe",
+     "media_type": "SSD",
+     "model": "SAMSUNG MZ1LB3T8HMLA-00007",
+     "rev": "EDB7602Q",
+     "serial": "S46FNC0R706907",
+     "size": 3840000000000,
+     "vendor": "Samsung",
+     "wwn": "eui.34364630527069070025384300000001"
+    },
+    {
+     "device": "nvme1n1",
+     "humanized_size": "3840 GB",
+     "interface": "PCIe",
+     "media_type": "SSD",
+     "model": "SAMSUNG MZ1LB3T8HMLA-00007",
+     "rev": "EDB7602Q",
+     "serial": "S46FNC0R706920",
+     "size": 3840000000000,
+     "vendor": "Samsung",
+     "wwn": "eui.34364630527069200025384300000001"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "d4a46dc6-7cac-417f-800c-faea63a46130"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M0LD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:f8:1a",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-08",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4725DKW",
+     "size": 1000000000000,
+     "wwn": "0x5000c500bdfe11aa"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "d6abfbc8-0952-4e1d-b4b6-cc2700d0829b"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LSKD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:27:0c:1e",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-07",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W47272YZ",
+     "size": 1000000000000,
+     "wwn": "0x5000c500bdfe55ff"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "87302a27-8f8f-49ab-853b-c32179c8286d"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2025-07-30",
+    "vendor": "Dell",
+    "version": "2.20.0"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R7525",
+    "serial": "842ZJD3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "Arcturus GL-XL [Instinct MI100]",
+    "gpu_vendor": "AMD"
+   },
+   "infiniband": true,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "ibp161s0",
+     "driver": "mlx5_core[ib_ipoib]",
+     "enabled": true,
+     "interface": "InfiniBand",
+     "mac": "1c:34:da:03:00:6e:8f:3a",
+     "model": "MT28908 Family [ConnectX-6]",
+     "vendor": "Mellanox"
+    },
+    {
+     "device": "ens3f0",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:4f:38",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "ens3f1",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:4f:39",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "eno8303",
+     "driver": "tg3",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "70:b5:e8:f0:0e:a6",
+     "model": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+     "rate": 1000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c03-03",
+   "node_type": "gpu_mi100",
+   "placement": {
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "SSDSC2KB480G8R",
+     "rev": "XCV1DL69",
+     "serial": "PHYF1013014R480BGN",
+     "size": 480000000000,
+     "wwn": "0x55cd2e4153259e78"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "f844f0a8-8bb6-4b92-9e20-6beeee3d2e30"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2018-05-17",
+    "vendor": "Dell",
+    "version": "2.8.0"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LRJD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GV100GL [Tesla V100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:f8:62",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-14",
+   "node_type": "gpu_p100_v100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4725DTF",
+     "size": 1000000000000,
+     "wwn": "0x5000c500bdfe5073"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "6812eb99-66ef-409b-a554-ba20e4000185"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LTJD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:62:bb",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-22",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4724P2A",
+     "size": 1000000000000,
+     "wwn": "0x5000c500b3164946"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "95bb908e-9448-42f4-b118-1da2ba945bb9"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2018-05-17",
+    "vendor": "Dell",
+    "version": "2.8.0"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LWJD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:27:12:29",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-18",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4724T09",
+     "size": 1000000000000,
+     "wwn": "0x5000c500b31637c5"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "d05e0f69-4b98-4d99-9acc-b3eb4cbcce7b"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2025-07-30",
+    "vendor": "Dell",
+    "version": "2.20.0"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R7525",
+    "serial": "84310D3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "Arcturus GL-XL [Instinct MI100]",
+    "gpu_vendor": "AMD"
+   },
+   "infiniband": true,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "ibp161s0",
+     "driver": "mlx5_core[ib_ipoib]",
+     "enabled": true,
+     "interface": "InfiniBand",
+     "mac": "1c:34:da:03:00:6e:90:b2",
+     "model": "MT28908 Family [ConnectX-6]",
+     "vendor": "Mellanox"
+    },
+    {
+     "device": "ens3f0",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:55:c2",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "ens3f1",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:55:c3",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    }
+   ],
+   "node_name": "c02-02",
+   "node_type": "gpu_mi100",
+   "placement": {
+    "rack": "2"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "SSDSC2KB480G8R",
+     "rev": "XCV1DL69",
+     "serial": "PHYF10130169480BGN",
+     "size": 480000000000,
+     "wwn": "0x55cd2e415325bc20"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "e03d0d25-fd91-4a32-9e4b-68ffa7802791"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LXJD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:f8:7a",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-20",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4725LL5",
+     "size": 1000000000000,
+     "wwn": "0x5000c500b35504ce"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "8f82dc27-9b61-419f-93ca-94d5b50b6a5a"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2018-05-17",
+    "vendor": "Dell",
+    "version": "2.8.0"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M3HD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:27:1d:ba",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-13",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W47272SZ",
+     "size": 1000000000000,
+     "wwn": "0x5000c500bdfea8be"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "e0e225f7-fda7-4d2d-adfb-d10d4dc971da"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2025-07-30",
+    "vendor": "Dell",
+    "version": "2.20.0"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R7525",
+    "serial": "84300D3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "Arcturus GL-XL [Instinct MI100]",
+    "gpu_vendor": "AMD"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "ens3f0",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:78:ea",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "ens3f1",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:78:eb",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "eno8303",
+     "driver": "tg3",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "70:b5:e8:f0:0e:82",
+     "model": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+     "rate": 1000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c03-02",
+   "node_type": "gpu_mi100",
+   "placement": {
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "SSDSC2KB480G8R",
+     "rev": "XCV1DL69",
+     "serial": "PHYF1013019S480BGN",
+     "size": 480000000000,
+     "wwn": "0x55cd2e4153259eb7"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "7f1268c6-b9b2-4594-a205-c11d2d68530c"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2025-07-30",
+    "vendor": "Dell",
+    "version": "2.20.0"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R7525",
+    "serial": "843WJD3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "Arcturus GL-XL [Instinct MI100]",
+    "gpu_vendor": "AMD"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "ens3f0",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:55:68",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "ens3f1",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:de:55:69",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    },
+    {
+     "device": "eno8303",
+     "driver": "tg3",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "ec:2a:72:50:79:58",
+     "model": "NetXtreme BCM5720 Gigabit Ethernet PCIe",
+     "rate": 1000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c03-04",
+   "node_type": "gpu_mi100",
+   "placement": {
+    "rack": "3"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "SSDSC2KB480G8R",
+     "rev": "XCV1DL69",
+     "serial": "PHYF1013006C480BGN",
+     "size": 480000000000,
+     "wwn": "0x55cd2e415325bbd3"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "2fd0e47c-3d4e-49d9-ab45-d31b413fb975"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2018-12-04",
+    "vendor": "Dell",
+    "version": "2.9.1"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LZKD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:27:25:2c",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-21",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4724V7N",
+     "size": 1000000000000,
+     "wwn": "0x5000c500b3546ee8"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "2d3214cc-f2db-4718-9efd-5d9f43f59ca8"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M4JD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "GM200GL [Tesla M40]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:fb:4e",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno2",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:fb:50",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-05",
+   "node_type": "gpu_m40",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "250 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST9250610NS",
+     "rev": "AA63",
+     "serial": "9XE0LHKP",
+     "size": 250000000000,
+     "wwn": "0x5000c5007a997b6d"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "151ab019-81ef-471d-b552-16f12f4b4a3f"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 256
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2022-10-25",
+    "vendor": "Dell",
+    "version": "2.10.2"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R6525",
+    "serial": "D769FF3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "GA100 [A100 PCIe 40GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "ens2f0",
+     "driver": "qede",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "34:80:0d:ed:52:26",
+     "model": "FastLinQ QL41000 Series 10/25/40/50GbE Controller",
+     "rate": 25000000000,
+     "vendor": "QLogic"
+    }
+   ],
+   "node_name": "liqid06",
+   "node_type": "compute_liqid",
+   "placement": {},
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 524288,
+    "cache_l3": 33554432,
+    "clock_speed": 2450000000,
+    "instruction_set": "x86_64",
+    "model": "AMD EPYC 7763 64-Core Processor",
+    "vendor": "AMD"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MZ7LH480HBHQ0D3",
+     "rev": "HG58",
+     "serial": "S5YJNA0R540744",
+     "size": 480000000000,
+     "wwn": "0x5002538e0157d276"
+    },
+    {
+     "device": "nvme1n1",
+     "humanized_size": "3840 GB",
+     "interface": "PCIe",
+     "media_type": "SSD",
+     "model": "SAMSUNG MZ1LB3T8HMLA-00007",
+     "rev": "EDB7602Q",
+     "serial": "S46FNC0R602278",
+     "size": 3840000000000,
+     "vendor": "Samsung",
+     "wwn": "eui.34364630526022780025384300000001"
+    },
+    {
+     "device": "nvme0n1",
+     "humanized_size": "3840 GB",
+     "interface": "PCIe",
+     "media_type": "SSD",
+     "model": "SAMSUNG MZ1LB3T8HMLA-00007",
+     "rev": "EDB7602Q",
+     "serial": "S46FNC0R706906",
+     "size": 3840000000000,
+     "vendor": "Samsung",
+     "wwn": "eui.34364630527069060025384300000001"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "377b941a-895f-4c98-8cbd-ed9f864cae52"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2019-07-25",
+    "vendor": "Dell",
+    "version": "2.10.5"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M2KD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GK210GL [Tesla K80]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:3e:bf",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno2",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:3e:c1",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-24",
+   "node_type": "gpu_k80",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "250 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST9250610NS",
+     "rev": "AA65",
+     "serial": "9XE0L99S",
+     "size": 250000000000,
+     "wwn": "0x5000c5007a84ee2e"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "5632a770-a933-4264-b90b-43181592f090"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 160
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2022-09-14",
+    "vendor": "Dell",
+    "version": "1.8.2"
+   },
+   "boot_mode": "uefi",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R650",
+    "serial": "8Y4FGT3"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "GA100 [A100 PCIe 40GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "256 GiB",
+    "ram_size": 274877906944
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "enp130s0np0",
+     "driver": "mlx5_core",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "b8:3f:d2:97:50:18",
+     "model": "MT28908 Family [ConnectX-6]",
+     "rate": 40000000000,
+     "vendor": "Mellanox"
+    }
+   ],
+   "node_name": "gigaio04",
+   "node_type": "compute_gigaio",
+   "placement": {},
+   "processor": {
+    "cache_l1d": 49807,
+    "cache_l1i": 32768,
+    "cache_l2": 1310720,
+    "cache_l3": 62914560,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) Platinum 8380 CPU @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "480 GB",
+     "interface": "SAS",
+     "media_type": "SSD",
+     "model": "MTFDDAK480TDS",
+     "rev": "D3DJ004",
+     "serial": "222539B8FD1A",
+     "size": 480000000000,
+     "wwn": "0x500a075139b8fd1a"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "d2376f39-b0ea-4648-b831-fdf84131066d"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2019-07-25",
+    "vendor": "Dell",
+    "version": "2.10.5"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M0KD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GK210GL [Tesla K80]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:64:99",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno2",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:64:9b",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-23",
+   "node_type": "gpu_k80",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "250 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST9250610NS",
+     "rev": "AA65",
+     "serial": "9XE0L7K8",
+     "size": 250000000000,
+     "wwn": "0x5000c5007a84b53b"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "b8ea6a5d-3836-4df0-a3dc-c7047171f522"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2019-07-25",
+    "vendor": "Dell",
+    "version": "2.10.5"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M2JD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 1,
+    "gpu_model": "GM200GL [Tesla M40]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:56:83",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    },
+    {
+     "device": "eno2",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:56:85",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-06",
+   "node_type": "gpu_m40",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "250 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST9250610NS",
+     "rev": "AA65",
+     "serial": "9XE0LESD",
+     "size": 250000000000,
+     "wwn": "0x5000c5007a853dfb"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "bb5c000d-6538-49a4-9d34-61441bf9f77d"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1LYHD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:5a:89",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-09",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4724RJK",
+     "size": 1000000000000,
+     "wwn": "0x5000c500b31517d6"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "bbdb34c4-00e0-4e52-958c-7608c18cacf1"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 56
+   },
+   "availability": "maintenance",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2019-07-26",
+    "vendor": "Dell",
+    "version": "2.10.5"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge C4130",
+    "serial": "HN51JH2"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 4,
+    "gpu_model": "GP100GL [Tesla P100 SXM2 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "enp9s0f0",
+     "driver": "ixgbe",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "a0:36:9f:f2:42:10",
+     "model": "Ethernet 10G 2P X520 Adapter",
+     "rate": 10000000000,
+     "vendor": "Intel"
+    }
+   ],
+   "node_name": "c11-04",
+   "node_type": "gpu_p100_nvlink",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 36700160,
+    "clock_speed": 2000000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2660 v4 @ 2.00GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "200 GB",
+     "interface": "SATA",
+     "media_type": "SSD",
+     "model": "INTEL SSDSC1BG20",
+     "rev": "G201DL2D",
+     "serial": "BTHC714604T1200QGN",
+     "size": 200000000000,
+     "wwn": "0x55cd2e414db91ddc"
+    },
+    {
+     "device": "nvme0n1",
+     "humanized_size": "1600 GB",
+     "interface": "PCIe",
+     "media_type": "SSD",
+     "model": "Dell Express Flash NVMe PM1725 1.6TB AIC",
+     "rev": "KPYABD3Q",
+     "serial": "S2MBNA0J200278",
+     "size": 1600000000000,
+     "vendor": "Samsung",
+     "wwn": "eui.002538927100243a"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "ac1163b1-831d-4642-9235-c39b68d24f90"
+  },
+  {
+   "architecture": {
+    "platform_type": "x86_64",
+    "smp_size": 2,
+    "smt_size": 48
+   },
+   "availability": "available",
+   "availability_until": null,
+   "bios": {
+    "release_date": "2015-03-09",
+    "vendor": "Dell",
+    "version": "1.2.10"
+   },
+   "boot_mode": "bios",
+   "chassis": {
+    "manufacturer": "Dell",
+    "name": "PowerEdge R730",
+    "serial": "1M1LD42"
+   },
+   "cluster_id": "chameleon",
+   "gpu": {
+    "gpu": true,
+    "gpu_count": 2,
+    "gpu_model": "GP100GL [Tesla P100 PCIe 16GB]",
+    "gpu_vendor": "NVIDIA"
+   },
+   "infiniband": false,
+   "main_memory": {
+    "humanized_ram_size": "128 GiB",
+    "ram_size": 137438953472
+   },
+   "monitoring": {
+    "wattmeter": false
+   },
+   "network_adapters": [
+    {
+     "device": "eno1",
+     "driver": "bnx2x",
+     "enabled": true,
+     "interface": "Ethernet",
+     "mac": "44:a8:42:26:54:1f",
+     "model": "NetXtreme II BCM57800 1/10 Gigabit Ethernet",
+     "rate": 10000000000,
+     "vendor": "Broadcom"
+    }
+   ],
+   "node_name": "c11-19",
+   "node_type": "gpu_p100",
+   "placement": {
+    "rack": "11"
+   },
+   "processor": {
+    "cache_l1d": 32768,
+    "cache_l1i": 32768,
+    "cache_l2": 262144,
+    "cache_l3": 31457280,
+    "clock_speed": 2300000000,
+    "instruction_set": "x86_64",
+    "model": "Intel(R) Xeon(R) CPU E5-2670 v3 @ 2.30GHz",
+    "vendor": "Intel"
+   },
+   "site_id": "tacc",
+   "storage_devices": [
+    {
+     "device": "sda",
+     "humanized_size": "1000 GB",
+     "interface": "SAS",
+     "media_type": "Rotational",
+     "model": "ST1000NX0443",
+     "rev": "NB33",
+     "serial": "W4725LV6",
+     "size": 1000000000000,
+     "wwn": "0x5000c500b354a2d5"
+    }
+   ],
+   "supported_job_types": {
+    "besteffort": false,
+    "deploy": true,
+    "virtual": "ivt"
+   },
+   "type": "node",
+   "uid": "22805a4a-e695-4b48-86b9-bcf5cd2074de"
+  }
+ ],
+ "offset": 0,
+ "total": 34
+}
