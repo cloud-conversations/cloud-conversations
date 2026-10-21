@@ -1,0 +1,231 @@
+# Settings in [defaults] can be overridden per adapter, kind, and site.
+# Precedence, lowest first: [defaults], the adapter, the site's kind, the site, a CLI flag.
+[defaults]
+
+# SSH user and image at the fake sites FAKE@BM and FAKE@KVM.
+ssh_user = "cc"
+image_name = "CC-Ubuntu24.04"
+os_release = "Ubuntu 24.04"
+
+# Seconds to wait for SSH on a new instance, and seconds between tries.
+ssh_s = 600
+ssh_poll_interval_s = 10
+
+# Boot attempts per reservation. The wait before each retry grows by boot_retry_s seconds.
+boot_attempts = 2
+boot_retry_s = 20
+# Reservations to try when the reserved host never boots.
+reservation_attempts = 2
+# Floating IPs to try when SSH never connects.
+address_attempts = 2
+
+
+# Seconds between status checks on a lease or instance.
+poll_interval_s = 10
+# Seconds to wait for an instance to be deleted, and seconds between checks.
+delete_timeout_s = 180
+delete_poll_interval_s = 5
+# Attempts for each read from a cloud API, and seconds between them.
+read_attempts = 3
+read_retry_s = 5
+
+# HTTP timeout for a testbed's public site index, catalog and search, in seconds.
+directory_api_s = 15
+# Timeout for the checks run on a new instance over SSH, in seconds.
+probe_s = 60
+
+# Model for every LLM call. Set CC_LLM_BASE_URL and CC_LLM_API_KEY for its endpoint.
+llm_model = "Qwen3-235B-A22B-Instruct-2507"
+llm_temperature = 0
+# Seconds to wait for each call, and retries after a failed call.
+llm_timeout_s = 120
+llm_max_retries = 2
+
+# Description agent: model calls per description, and hardware and image search results
+# shown to the model.
+max_rounds = 6
+max_candidates_rendered = 40
+max_images_rendered = 10
+
+# Build agent: model calls per build, new leases per build, and run events shown to the model.
+max_build_rounds = 4
+max_leases_per_build = 3
+max_events_rendered = 40
+
+# Console log lines to fetch from a failed boot, and characters of it to keep.
+console_lines = 100
+console_chars = 4000
+
+
+# Documentation search for `ccx ask`, the chat, and the agents.
+[knowledge]
+
+enabled = true
+
+embedding_model = "BAAI/bge-large-en-v1.5"
+reranker_model = "BAAI/bge-reranker-base"
+# Drop search results that the reranker scores below this, from 0 to 1.
+min_reranker_score = 0.5
+# Text added to every question before searching, after query_instruction.
+query_prefix = "A question regarding the Chameleon Cloud testbed: "
+
+# Passage (parent) and chunk (child) sizes and overlaps, in characters.
+parent_chars = 2000
+parent_overlap = 200
+child_chars = 400
+child_overlap = 50
+
+# Chunks to fetch from the vector search.
+fetch_candidates = 50
+# Chunks to rerank.
+pool_candidates = 20
+# Passages to give the model.
+passages = 6
+# Earlier questions and answers to include with a follow-up question.
+max_history_exchanges = 3
+
+# HTTP timeout and attempts when `ccx index` fetches a page. The wait before each retry
+# grows by fetch_retry_s seconds.
+fetch_timeout_s = 15
+fetch_attempts = 3
+fetch_retry_s = 2
+
+[knowledge.sources.readthedocs]
+kind = "sphinx"
+url = "https://chameleoncloud.readthedocs.io/en/latest/"
+label = "Chameleon Docs"
+primary = true
+min_chars = 500
+exclude = ["index.html"]
+
+[knowledge.sources.python_chi]
+kind = "sphinx"
+url = "https://python-chi.readthedocs.io/en/latest/"
+index = "index.html"
+label = "Python CHI Docs"
+primary = true
+min_chars = 500
+
+[knowledge.sources.blog]
+kind = "blog"
+url = "https://blog.chameleoncloud.org"
+label = "Chameleon Blog"
+categories = ["tips-and-tricks"]
+
+
+# Each [adapters.<name>] table is one testbed.
+[adapters.chameleon]
+label = "Chameleon"
+# Chameleon usernames that get the Admin page.
+admins = []
+# Chameleon's public list of sites.
+site_index_url = "https://api.chameleoncloud.org/sites"
+# Longest lease in hours, longest GPU lease in hours, and how many days ahead a lease can start.
+max_lease_hours = 168
+max_gpu_lease_hours = 168
+max_lead_days = 14
+
+# User to log in as on new instances.
+ssh_user = "cc"
+
+# Image to boot when a description names none.
+image_name = "CC-Ubuntu24.04"
+os_release = "Ubuntu 24.04"
+
+# The network instances boot on.
+instance_network = "sharednet1"
+# The external network public addresses come from.
+floating_ip_pool = "public"
+# How Keystone federates a logged-in user's Keycloak token.
+identity_provider = "chameleon"
+federation_protocol = "openid"
+project_domain = "chameleon"
+
+# Chameleon names its images CC-<Distro><Version>, with -ARM64 for aarch64 builds.
+[adapters.chameleon.images]
+prefix = "CC-"
+arch_markers = { aarch64 = ["arm64", "aarch64"] }
+# Glance property that marks the images Chameleon supports.
+supported_properties = { chameleon-supported = "true" }
+
+# Users log in through Chameleon's Keycloak.
+# Set CC_OIDC_CHAMELEON_ISSUER, CC_OIDC_CHAMELEON_CLIENT_ID and CC_OIDC_CHAMELEON_CLIENT_SECRET.
+[adapters.chameleon.login]
+username_claim = "preferred_username"
+projects_claim = "projects"
+email_claim = "email"
+
+[adapters.chameleon.kinds.baremetal]
+reservation_kind = "physical_host"
+# Flavor to boot a reserved host with.
+baremetal_flavor = "baremetal"
+# Seconds a lease may take to become active after its start, and an instance after boot.
+lease_active_s = 1800
+instance_active_s = 2400
+
+[adapters.chameleon.kinds.virtual]
+reservation_kind = "flavor_instance"
+max_lease_hours = 4320
+uses_security_groups = true
+lease_active_s = 600
+instance_active_s = 900
+
+[adapters.chameleon.sites."CHI@UC"]
+kinds = ["baremetal"]
+
+[adapters.chameleon.sites."CHI@TACC"]
+kinds = ["virtual", "baremetal"]
+
+[adapters.chameleon.sites."CHI@NCAR"]
+kinds = ["baremetal"]
+
+[adapters.chameleon.sites."KVM@TACC"]
+kinds = ["virtual"]
+
+[adapters.chameleon.sites."KVM@TACC".retirement]
+retires_on = 2027-01-15
+warn_from = 2027-01-01
+notice = "KVM@TACC retires on 2027-01-15, per Chameleon's notice of 2026-08-01. Consider the VM flavors at CHI@TACC."
+retired_notice = "KVM@TACC has been retired. Try the VM flavors at CHI@TACC."
+
+# Settings for the API and the workers.
+[service]
+
+# Directory of prompts and testbed guidance.
+bundle_dir = "bundle"
+
+host = "127.0.0.1"
+port = 8000
+
+broker_url = "redis://localhost:6379/0"
+
+# Seconds before a job is killed.
+job_timeout_s = 5400
+
+# Recent messages in the chat that the router reads.
+route_history = 6
+
+# Characters of the first message to use as a chat's title.
+thread_title_chars = 60
+
+# Scopes to request from the login provider at login.
+oidc_scope = "openid profile email"
+
+session_days = 30
+
+# Choices of feedback per page on the Admin page, default first.
+feedback_page_sizes = [5, 25, 100]
+# Choices of users per page on the Admin page, default first.
+user_page_sizes = [25, 100]
+
+# Messages each user can send in 24 hours.
+max_messages_per_day = 200
+# Builds each user can run at once.
+max_builds_per_user = 2
+# Running builds plus runs with live hardware, for each user.
+max_active_experiments_per_user = 4
+
+# Allow local test users to log in with a password.
+local_login = false
+# The testbed local test users belong to.
+local_users_testbed = "chameleon"

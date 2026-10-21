@@ -1,0 +1,78 @@
+[project]
+name = "cloud-conversations"
+version = "0.1.0"
+description = "Describe, provision, and verify experiment environments on Chameleon"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "psycopg[binary]>=3.1",
+    "pydantic>=2.0",
+    "alembic>=1.13",
+    "openai>=1.0",
+    # Encrypts refresh tokens and the system key.
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.0",
+    "ruff>=0.5",
+    # FastAPI TestClient's transport.
+    "httpx>=0.27",
+]
+# Needed by the API and the workers.
+service = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "celery[redis]>=5.4",
+]
+# Needed to build or search the knowledge base.
+knowledge = [
+    "beautifulsoup4>=4.13",
+    "langchain-text-splitters>=0.3",
+    "sentence-transformers>=3.0",
+    # The CPU build on Linux.
+    "torch>=2.0",
+]
+# Needed to reach a Chameleon site.
+integration = [
+    "python-chi>=1.2",
+    # Chameleon's fork, not upstream python-blazarclient.
+    "chameleon-blazarclient>=3.6.3,<3.6.4",
+    "paramiko>=3.0",
+    "openstacksdk>=1.0",
+    # Registers the v3chameleonoidc keystoneauth1 plugin.
+    "ccauth @ git+https://github.com/ChameleonCloud/ccauth.git@7650b494eb79c6ac0beccac114081f88e22bb167",
+]
+
+[project.scripts]
+ccx = "cloud_conversations.cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cloud_conversations"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "BLE", "SLF", "SIM", "RUF100"]
