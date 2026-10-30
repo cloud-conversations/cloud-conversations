@@ -18,14 +18,14 @@ from cloud_conversations.adapter.protocol import (
     TestbedAdapter,
 )
 from cloud_conversations.config import Config
+from cloud_conversations.environment.install import InstallSeconds
 from cloud_conversations.schema.description import (
     RESERVATION_KINDS,
-    CheckKind,
-    Comparator,
     ComputeKey,
     RequirementKey,
 )
 from cloud_conversations.schema.images import EPOCH
+from cloud_conversations.validator.rubric import CheckKind, Comparator
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ class SiteDoc(BaseModel):
     max_lease_hours: dict[ComputeKey, int]
     max_gpu_lease_hours: dict[ComputeKey, int]
     max_lead_days: int
+    install_s: InstallSeconds
     retires_on: date | None = None
     # Label of the testbed that marks images as supported.
     testbed_label: str
@@ -152,6 +153,7 @@ def _site_doc(
         max_lease_hours={key: s.max_lease_hours for key, s in by_kind.items()},
         max_gpu_lease_hours={key: s.max_gpu_lease_hours for key, s in by_kind.items()},
         max_lead_days=settings.max_lead_days,
+        install_s=settings.install_s,
         retires_on=retirement.retires_on if retirement else None,
         testbed_label=config.label(testbed) if (testbed := config.adapter_for(descriptor.site))
         else "the testbed",

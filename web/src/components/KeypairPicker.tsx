@@ -16,7 +16,7 @@ export function KeypairPicker({
   siteKeypairs: Record<string, string> | null;
   site: string | null;
 }) {
-  if (siteKeypairs && !(site && site in siteKeypairs)) {
+  if (siteKeypairs && !site) {
     return <p className="text-sm text-grey">Keypair: one per site, shown once a site is chosen</p>;
   }
   return siteKeypairs && site ? (
@@ -79,7 +79,7 @@ function AtSite({
         Keypair at {site}
         <SiteKeypairSelect
           site={site}
-          value={siteKeypairs[site]}
+          value={siteKeypairs[site] ?? ""}
           onChange={(name) => chosen.mutate({ site_keypairs: { ...siteKeypairs, [site]: name } })}
           label={`Keypair at ${site}`}
           disabled={chosen.isPending}

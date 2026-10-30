@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -41,3 +44,21 @@ class StepError(Exception):
         # Set to retry on a new reservation or address.
         self.retry_reservation = retry_reservation
         self.retry_address = retry_address
+
+
+# When the job carrying the steps must stop, in time.monotonic() seconds.
+_FINISH_BY: ContextVar[float | None] = ContextVar("finish_by", default=None)
+
+
+@contextmanager
+def finishing_by(deadline: float) -> Iterator[None]:
+    """Make the steps inside stop waiting by deadline, in time.monotonic() seconds."""
+    token = _FINISH_BY.set(deadline)
+    try:
+        yield
+    finally:
+        _FINISH_BY.reset(token)
+
+
+def finish_by() -> float | None:
+    return _FINISH_BY.get()

@@ -2,7 +2,9 @@ import type { Event, Run } from "../api/types";
 import { isTerminal } from "../api/types";
 import { useRun, useRunEvents, useTeardown } from "../hooks/useRun";
 import { askToRelease, named, noun, verb } from "../resources";
+import { isSoftwareCheck } from "../software";
 import { Failed } from "./Failed";
+import { SoftwareResults } from "./Software";
 import { WAITING } from "./PendingRow";
 import { clock, stamp } from "../time";
 
@@ -103,7 +105,7 @@ export function RunCard({ runId, threadId, releasing, waiting, building }: Props
         <table className="w-full text-sm border-b border-grey-light">
           <caption className="sr-only">Rubric results</caption>
           <tbody>
-            {run.results.map((result) => (
+            {run.results.filter((result) => !isSoftwareCheck(result)).map((result) => (
               <tr key={result.check_id} className="border-b border-grey-lighter">
                 <td className="px-4 py-1 w-16">
                   <span
@@ -113,7 +115,7 @@ export function RunCard({ runId, threadId, releasing, waiting, building }: Props
                   </span>
                 </td>
                 <th scope="row" className="text-left font-normal text-grey py-1">
-                  {result.kind}
+                  {result.kind} {result.target}
                 </th>
                 <td className="px-4 py-1 font-mono text-xs">
                   wanted {String(result.expected)}, got {String(result.actual)}
@@ -122,6 +124,11 @@ export function RunCard({ runId, threadId, releasing, waiting, building }: Props
             ))}
           </tbody>
         </table>
+      )}
+      {run.results && run.results.some(isSoftwareCheck) && (
+        <div className="py-1 border-b border-grey-light">
+          <SoftwareResults results={run.results} />
+        </div>
       )}
 
       <ol className="px-4 py-3 space-y-0.5 text-sm">

@@ -68,6 +68,21 @@ describe("the keypair picker", () => {
     );
   });
 
+  it("asks for a keypair at the chat's site if the chat has none there yet", async () => {
+    const calls = show(null, { "KVM@TACC": "tacc-key" }, "CHI@UC");
+    await screen.findByRole("option", { name: "uc-key-2" });
+
+    await userEvent.selectOptions(screen.getByLabelText("Keypair at CHI@UC"), "uc-key-2");
+
+    await waitFor(() =>
+      expect(calls).toContainEqual([
+        "PATCH",
+        "/api/threads/t1",
+        JSON.stringify({ site_keypairs: { "KVM@TACC": "tacc-key", "CHI@UC": "uc-key-2" } }),
+      ]),
+    );
+  });
+
   it("moves the chat to the imported key picked", async () => {
     const calls = show(null);
     await screen.findByRole("option", { name: "cc-laptop-x7k2p9" });

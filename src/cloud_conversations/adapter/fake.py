@@ -29,6 +29,7 @@ from cloud_conversations.adapter.protocol import (
     SiteDescriptor,
 )
 from cloud_conversations.config import Config, KindFacts, Settings, resource_name
+from cloud_conversations.environment import items
 from cloud_conversations.schema.images import ImageRules
 from cloud_conversations.schema.search import Candidate, Candidates, NodeQuery
 from cloud_conversations.validator.probe import build_probe_script
@@ -79,6 +80,10 @@ class FakeInstance:
     node_type: str | None
     run_id: uuid.UUID | None
     security_groups: list[str] = field(default_factory=list)
+    # Installed items, each an installer line split on spaces.
+    software: list[list[str]] = field(default_factory=list)
+    # Each install's status, by its unit.
+    installs: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -620,11 +625,63 @@ class FakeAdapter:
         cmd = command.strip()
         if cmd == "true":
             return ExecResult(stdout="", stderr="", exit_code=0)
-        if cmd == build_probe_script(self._site(site).descriptor.dns_probe_host):
-            return ExecResult(
-                stdout=self._facts_for(inst).to_probe_stdout(), stderr="", exit_code=0
-            )
+        probe = build_probe_script(
+            self._site(site).descriptor.dns_probe_host, self.settings(site).venv_dir, []
+        )
+        if cmd == probe or cmd.startswith(f"{probe}\n"):
+            facts = [self._facts_for(inst).to_probe_stdout()]
+            facts += [_software_fact(inst, *line.split()) for line in _heredoc(cmd, "END_CHECKS")]
+            return ExecResult(stdout="\n".join(facts), stderr="", exit_code=0)
+        unit = next((line[5:] for line in cmd.splitlines() if line.startswith("unit=")), "")
+        if "<<'END_ITEMS'" in cmd:
+            inst.software = [line.split() for line in _heredoc(cmd, "END_ITEMS")]
+            inst.installs[unit] = "done"
+            return ExecResult(stdout="", stderr="", exit_code=0)
+        if 'echo "${status:-missing}"' in cmd:
+            status = inst.installs.get(unit, "missing")
+            return ExecResult(stdout=status, stderr="", exit_code=0)
         return ExecResult(stdout="", stderr=f"fake: unrecognised command {command!r}", exit_code=1)
+
+
+def _heredoc(command: str, end: str) -> list[str]:
+    """The body of the heredoc in a command that ends at `end`."""
+    lines = command.splitlines()
+    opening = next((n for n, line in enumerate(lines) if f"<<'{end}'" in line), None)
+    if opening is None:
+        return []
+    return lines[opening + 1 : lines.index(end, opening + 1)]
+
+
+def _software_fact(inst: FakeInstance, kind: str, target: str) -> str:
+    """The line the probe prints for one software check."""
+
+    def item(key: str, first: str | None = None) -> list[str] | None:
+        return next(
+            (i for i in inst.software if i[0] == key and (first is None or i[1] == first)), None
+        )
+
+    pip = next((i for i in inst.software if i[0] == "pip_package"
+                and items.target("pip_package", i[1]) == target), None)
+    npm = next((i for i in inst.software if i[0] == "npm_package"
+                and items.target("npm_package", i[1]) == target), None)
+    python, node = item("python_version"), item("node_version")
+    docker, container = item("docker"), item("container", target)
+    repository = next((i for i in inst.software if i[0] == "repository" and i[3] == target), None)
+    ports = {p for i in inst.software if i[0] == "container" for p in i[3].split(",")}
+    value = {
+        "package_installed": item("system_package", target) is not None,
+        "python_version": f"{python[1]}.0" if python else "",
+        "pip_package": "1.0.0" if pip else "",
+        "node_version": f"{node[1]}.0.0" if node else "",
+        "npm_package": "1.0.0" if npm else "",
+        "docker_running": docker is not None,
+        "docker_gpu": docker is not None and docker[1] == "1",
+        "container_running": container is not None,
+        "port_listening": target in ports,
+        "git_head": repository[2] if repository else "",
+    }[kind]
+    shown = str(value).lower() if isinstance(value, bool) else value
+    return f"{kind}={shown}" if target == "-" else f"{kind} {target}={shown}"
 
 
 _NODE = NodeType(

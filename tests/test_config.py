@@ -36,6 +36,26 @@ def test_a_site_table_overrides_only_that_site(tmp_path):
     assert config.for_site("CHI@TACC", "physical_host").ssh_user == "cc"
 
 
+def test_a_site_that_sets_one_install_time_keeps_the_others_from_defaults(tmp_path):
+    path = _write(
+        tmp_path,
+        '[defaults.install_s]\nsystem_package = 111\n'
+        '[adapters.c.kinds.bm]\nreservation_kind = "physical_host"\n'
+        '[adapters.c.sites."CHI@UC"]\nkinds = ["bm"]\ninstall_s = { docker = 1800 }\n',
+    )
+    install_s = load_config(path).for_site("CHI@UC", "physical_host").install_s
+    assert (install_s.system_package, install_s.docker) == (111, 1800)
+
+
+def test_an_archive_url_without_its_placeholders_is_refused(tmp_path):
+    path = _write(
+        tmp_path,
+        '[defaults.repository_archive_urls]\n"gitlab.com" = "https://gitlab.com/archive.tar.gz"\n',
+    )
+    with pytest.raises(ConfigError, match="is not an https URL with {path} and {ref} in it"):
+        load_config(path)
+
+
 def test_a_site_with_two_kinds_resolves_each_apart(tmp_path):
     path = _write(
         tmp_path,

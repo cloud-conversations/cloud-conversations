@@ -20,7 +20,7 @@ def test_memory_and_disk_are_read_in_the_catalogs_units(tmp_path):
     _stub(tmp_path, "lsblk", "480103981056 disk\n1000000000 part\n240057409536 disk")
 
     probed = subprocess.run(
-        ["sh", "-c", build_probe_script("example.org")],
+        ["sh", "-c", build_probe_script("example.org", "venv", [])],
         capture_output=True, text=True, check=False,
         env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
     )

@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING
 from cloud_conversations.adapter.errors import AdapterError
 from cloud_conversations.config import Settings
 from cloud_conversations.db.store import Description, Event, Resource, Run
-from cloud_conversations.schema.runs import CheckResult
+from cloud_conversations.environment.install import poll_command
+from cloud_conversations.runner.validate import probe_host
+from cloud_conversations.steps.provision import install_unit
 from cloud_conversations.validator.evaluate import evaluate_rubric
-from cloud_conversations.validator.probe import probe_host
+from cloud_conversations.validator.rubric import CheckResult, fact_name
 
 if TYPE_CHECKING:
     from cloud_conversations.adapter.protocol import TestbedAdapter
@@ -68,6 +70,8 @@ def read(
             return _instances(adapter, site)
         if name == "console_log":
             return _console_log(adapter, site, resources, settings)
+        if name == "install_log":
+            return _install_log(adapter, site, run, settings)
         if name == "availability":
             return _availability(adapter, site, desc)
         return _validate(adapter, site, run, desc, settings)
@@ -111,7 +115,7 @@ def _approved(desc: Description) -> list[str]:
     lines += [f"  {i.key:<12} {i.value!r:<24} {i.source}" for i in req.items]
     lines.append("rubric:")
     lines += [
-        f"  {c.id:<6} {c.kind:<14} {c.comparator:<6} {c.expected!r}" for c in desc.rubric
+        f"  {c.id:<6} {c.fact():<14} {c.comparator:<6} {c.expected!r}" for c in desc.rubric
     ]
     return [*lines, ""]
 
@@ -187,6 +191,21 @@ def _console_log(
     return log[-settings.console_chars :] or "the console is empty"
 
 
+def _install_log(adapter: TestbedAdapter, site: str, run: Run, settings: Settings) -> str:
+    steps = run.plan.steps if run.plan is not None else []
+    step = next((s for s in steps if s.action == "install_software"), None)
+    if step is None:
+        return "this run installs no software"
+    if run.connection is None:
+        return "this run reached no host, so it installed nothing"
+    unit = install_unit(run.run_id, step.step_id, {**step.args, "step_id": step.step_id})
+    result = adapter.ssh_exec(
+        site, run.connection.host, run.connection.user,
+        poll_command(unit, settings.install_log_lines), timeout_s=settings.install_call_s,
+    )
+    return result.stdout.strip() or "the install wrote no log"
+
+
 def _availability(adapter: TestbedAdapter, site: str, desc: Description) -> str:
     req = desc.requirements
     node_type = req.value_of("node_type")
@@ -224,7 +243,7 @@ def _validate(
     if run.connection is None:
         return "this run reached no host, so there is nothing to measure"
     facts = probe_host(
-        adapter, site, run.connection.host, run.connection.user, settings.probe_s
+        adapter, site, run.connection.host, run.connection.user, desc.rubric, settings
     )
     return "\n".join(_check_line(r) for r in evaluate_rubric(desc.rubric, facts))
 
@@ -232,6 +251,7 @@ def _validate(
 def _check_line(result: CheckResult) -> str:
     mark = "PASS" if result.passed else "FAIL"
     return (
-        f"{mark} {result.check_id:<6} {result.kind:<14} "
+        f"{mark} {result.check_id:<6} {fact_name(result.kind, result.target):<14} "
         f"expected {result.expected!r}, got {result.actual!r}"
     )
+

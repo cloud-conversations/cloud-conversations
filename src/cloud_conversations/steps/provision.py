@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from datetime import datetime, timezone
 
 import cloud_conversations.db.store as store
@@ -15,10 +16,12 @@ from cloud_conversations.adapter.errors import (
 )
 from cloud_conversations.adapter.protocol import Lease
 from cloud_conversations.config import ConfigError, resource_name
+from cloud_conversations.environment.install import InstallError, InstallSettings, install
+from cloud_conversations.environment.items import SETUP_KEYS
 from cloud_conversations.schema.description import reservation_kind_of
 from cloud_conversations.schema.runs import Connection
 from cloud_conversations.steps import retry
-from cloud_conversations.steps.context import StepContext, StepError
+from cloud_conversations.steps.context import StepContext, StepError, finish_by
 from cloud_conversations.steps.failure import FailureKind, out_of_addresses, unusable_host
 from cloud_conversations.steps.failure import record as record_failure
 from cloud_conversations.steps.idempotency import derive_key
@@ -438,3 +441,75 @@ def wait_ssh(ctx: StepContext, args: dict) -> dict:
     except Exception as exc:
         _failed(ctx, step_id, "wait_ssh", "step", exc)
         raise StepError(exc, "step") from exc
+
+
+def install_unit(run_id: uuid.UUID, step_id: str, args: dict) -> str:
+    """The systemd unit name for a run's install."""
+    return f"cc-setup-{derive_key(run_id, step_id, 'install_software', args)[:16]}"
+
+
+def install_software(ctx: StepContext, args: dict) -> dict:
+    """Install the description's software, and wait for it to finish."""
+    step_id: str = args["step_id"]
+    try:
+        _started(ctx, step_id, "install_software", args)
+        settings = ctx.settings
+        host: str = ctx.outputs["host"]
+        user = settings.ssh_user
+        if user is None:
+            raise ConfigError(f"set ssh_user for {ctx.site}")
+        software = [(i.key, i.value) for i in ctx.requirements.items if i.key in SETUP_KEYS]
+        timeout_s = settings.install_s.total(key for key, _ in software)
+        lease_end: datetime | None = ctx.outputs.get("lease_end")
+        if lease_end is not None:
+            timeout_s = min(timeout_s, _until(lease_end))
+        deadline = finish_by()
+        job_s = deadline - time.monotonic() if deadline is not None else timeout_s
+
+        def run(command: str, call_s: float) -> tuple[int, str]:
+            try:
+                result = ctx.adapter.ssh_exec(ctx.site, host, user, command, timeout_s=call_s)
+            except (TransientError, AdapterTimeoutError):
+                return 1, ""
+            return result.exit_code, result.stdout
+
+        install(
+            run,
+            install_unit(ctx.run_id, step_id, args),
+            InstallSettings(
+                user=user,
+                venv_dir=settings.venv_dir,
+                uv_url=settings.uv_url,
+                node_dist_url=settings.node_dist_url,
+                docker_rpm_repo_url=settings.docker_rpm_repo_url,
+                nvidia_toolkit_url=settings.nvidia_toolkit_url,
+                install_lock_s=settings.install_lock_s,
+            ),
+            software,
+            timeout_s=min(timeout_s, job_s),
+            poll_s=settings.install_poll_interval_s,
+            call_s=settings.install_call_s,
+            log_lines=settings.install_log_lines,
+            on_poll=lambda: _heartbeat(ctx),
+        )
+        return {}
+
+    except InstallError as exc:
+        kind: FailureKind = "description" if exc.kind == "unknown" else "step"
+        if exc.kind == "timeout" and job_s < timeout_s:
+            exc = InstallError(
+                "timeout",
+                "the build ran out of time with the install still running; resume the run "
+                "to keep waiting for it",
+                exc.log,
+            )
+        record_failure(
+            ctx.run_id, ctx.owner_id, step_id, "install_software", kind, str(exc), log=exc.log
+        )
+        raise StepError(exc, kind) from exc
+    except StepError:
+        raise
+    except Exception as exc:
+        _failed(ctx, step_id, "install_software", "step", exc)
+        raise StepError(exc, "step") from exc
+

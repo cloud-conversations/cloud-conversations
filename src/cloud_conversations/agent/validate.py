@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import datetime, timedelta, timezone
 
 from cloud_conversations.adapter.protocol import Flavor
@@ -14,9 +15,13 @@ from cloud_conversations.agent.contract import (
     InspectStep,
     KnowledgeStep,
     ProposedDescription,
+    ReadRepositoryStep,
     RetryStep,
 )
 from cloud_conversations.db.store import Run
+from cloud_conversations.environment.items import GIT_REF, REPOSITORY_URL
+from cloud_conversations.environment.repo import Repository
+from cloud_conversations.environment.rules import repository_problems, setup_problems
 from cloud_conversations.knowledge.retrieve import KnowledgeBase
 from cloud_conversations.runner.sequential import PlanError, build_plan
 from cloud_conversations.schema.description import (
@@ -30,6 +35,7 @@ from cloud_conversations.schema.description import (
 from cloud_conversations.schema.images import parse_release
 from cloud_conversations.schema.runs import SETTLED_STATES
 from cloud_conversations.schema.search import Candidates, NodeQuery
+from cloud_conversations.validator.rubric import SOFTWARE_KINDS
 
 # Fields that make one search different from another.
 _FILTERS: set[str] = set(NodeQuery.model_fields) - {"intent"}
@@ -137,6 +143,53 @@ def validate_image_search(
     return []
 
 
+def validate_read_repository(step: ReadRepositoryStep, read: list[Repository]) -> list[str]:
+    """Reasons to refuse a repository read."""
+    if not REPOSITORY_URL.fullmatch(step.url):
+        return [f"{step.url!r} is not an https URL of a repository"]
+    if step.ref is not None and not GIT_REF.fullmatch(step.ref):
+        return [f"{step.ref!r} is not a branch, tag or commit"]
+    if any(r.url == step.url and r.ref == (step.ref or "HEAD") for r in read):
+        return ["this repository has already been read; use what it returned"]
+    return []
+
+
+def validate_against_repositories(
+    proposed: ProposedDescription, read: list[Repository], readable_hosts: Collection[str]
+) -> list[str]:
+    """Check the description against the repositories it read."""
+    reasons = repository_problems(
+        [(item.key, item.value) for item in proposed.items], read, readable_hosts
+    )
+    gpu = proposed.value_of("gpu_model") or proposed.value_of("gpu_count")
+    for repository in read:
+        cuda = repository.facts.get("cuda")
+        if cuda is not None and not gpu:
+            reasons.append(
+                f"{cuda.path} in {repository.url} uses CUDA {cuda.value}; ask for a GPU, "
+                "and an image with CUDA"
+            )
+    return reasons
+
+
+def validate_revision(proposed: ProposedDescription, prior: Requirements) -> list[str]:
+    """Check that no value this revision changed still claims to be a default."""
+    changed: list[tuple[str, str]] = []
+    if proposed.duration_hours != prior.duration_hours and proposed.duration_source == "default":
+        changed.append(("duration_hours", "duration_source"))
+    if proposed.start_at != prior.start_at and proposed.start_source == "default":
+        changed.append(("start_at", "start_source"))
+    for item in proposed.items:
+        before = [i.value for i in prior.items if i.key == item.key]
+        if item.source == "default" and before and item.value not in before:
+            changed.append((item.key, f"the source of {item.key}"))
+    return [
+        f"this revision changed {what}, so it is no longer a default; set {field} to asked "
+        "if the user gave it, or inferred"
+        for what, field in changed
+    ]
+
+
 def validate_knowledge(
     question: str, knowledge: KnowledgeBase | None, asked: list[str]
 ) -> list[str]:
@@ -217,6 +270,7 @@ def validate_description(
     )
 
     reasons += _rubric(proposed)
+    reasons += setup_problems([(i.key, i.value) for i in proposed.items], proposed.rubric)
 
     if not reasons:
         try:
@@ -227,6 +281,7 @@ def validate_description(
                 doc.descriptor,
                 plan_seq=0,
                 keypair="",
+                install_s=doc.install_s,
             )
         except PlanError as exc:
             reasons.append(str(exc))
@@ -291,7 +346,7 @@ def _rubric(proposed: ProposedDescription) -> list[str]:
     kinds = {check.kind for check in proposed.rubric}
 
     for check in proposed.rubric:
-        if check.from_requirement is None:
+        if check.from_requirement is None or check.kind in SOFTWARE_KINDS:
             continue
         if check.kind not in VERIFIABLE_KEYS:
             reasons.append(

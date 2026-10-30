@@ -117,7 +117,6 @@ describe("a notice", () => {
     await userEvent.click(screen.getByLabelText("A keypair I have at each site"));
     await screen.findByRole("option", { name: "my-uc-key" });
     await userEvent.selectOptions(screen.getByLabelText("Keypair at CHI@UC"), "my-uc-key");
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     await screen.findByRole("option", { name: "my-tacc-key" });
     await userEvent.selectOptions(screen.getByLabelText("Keypair at KVM@TACC"), "my-tacc-key");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -127,6 +126,38 @@ describe("a notice", () => {
       "PATCH",
       "/api/threads/t1",
       JSON.stringify({ site_keypairs: { "CHI@UC": "my-uc-key", "KVM@TACC": "my-tacc-key" } }),
+    ]);
+  });
+
+  it("saves the keypairs it could load when a site's keypairs fail to load", async () => {
+    const sent: [string, string, string | undefined][] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string, init?: RequestInit) => {
+        sent.push([init?.method ?? "GET", path, init?.body as string | undefined]);
+        if (path === "/api/profile/keypairs?site=KVM%40TACC") {
+          return { ok: false, status: 502, json: async () => ({ detail: "the site is down" }) };
+        }
+        const answers: Record<string, unknown> = {
+          "/api/profile": PROFILE,
+          "/api/profile/keypairs?site=CHI%40UC": [{ name: "my-uc-key" }],
+        };
+        return { ok: true, status: 200, json: async () => answers[path] ?? {} };
+      }),
+    );
+    const { onSaved } = show(NEEDS_KEYPAIR);
+
+    await userEvent.click(screen.getByLabelText("A keypair I have at each site"));
+    await screen.findByRole("option", { name: "my-uc-key" });
+    await screen.findByText(/Couldn't load your keypairs at KVM@TACC/);
+    await userEvent.selectOptions(screen.getByLabelText("Keypair at CHI@UC"), "my-uc-key");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(sent).toContainEqual([
+      "PATCH",
+      "/api/threads/t1",
+      JSON.stringify({ site_keypairs: { "CHI@UC": "my-uc-key" } }),
     ]);
   });
 

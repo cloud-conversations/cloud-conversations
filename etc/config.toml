@@ -34,6 +34,32 @@ directory_api_s = 15
 # Timeout for the checks run on a new instance over SSH, in seconds.
 probe_s = 60
 
+# Seconds between checks on a software install, the timeout for each check, and lines of
+# the install's log to show.
+install_poll_interval_s = 15
+install_call_s = 60
+install_log_lines = 40
+# Seconds an install waits for another process to release the package manager's lock.
+install_lock_s = 600
+# Folder under the SSH user's home for the Python environment.
+venv_dir = "venv"
+# Where installs download uv and Node, and the package repositories for Docker on CentOS
+# and for NVIDIA's container toolkit.
+uv_url = "https://github.com/astral-sh/uv/releases/download/0.12.5"
+node_dist_url = "https://nodejs.org/dist"
+docker_rpm_repo_url = "https://download.docker.com/linux/centos/docker-ce.repo"
+nvidia_toolkit_url = "https://nvidia.github.io/libnvidia-container/stable"
+# Registries the description agent looks up packages and images in, and the timeout for
+# each lookup or repository download, in seconds.
+pypi_url = "https://pypi.org/pypi"
+npm_registry_url = "https://registry.npmjs.org"
+docker_registry_url = "https://registry-1.docker.io"
+registry_s = 15
+# The largest repository archive the description agent reads, in bytes, and the
+# characters of each setup file it is shown.
+repository_bytes = 50000000
+repository_file_chars = 6000
+
 # Model for every LLM call. Set CC_LLM_BASE_URL and CC_LLM_API_KEY for its endpoint.
 llm_model = "Qwen3-235B-A22B-Instruct-2507"
 llm_temperature = 0
@@ -55,6 +81,23 @@ max_events_rendered = 40
 # Console log lines to fetch from a failed boot, and characters of it to keep.
 console_lines = 100
 console_chars = 4000
+
+# Seconds to allow for installing each kind of software. A description's lease must be at
+# least as long as the total for its software.
+[defaults.install_s]
+system_package = 300
+repository = 300
+python_version = 300
+pip_package = 600
+node_version = 300
+npm_package = 300
+docker = 900
+container = 900
+
+# Where to download a repository's archive, by host. {path} is the repository's owner and
+# name, and {ref} its branch, tag or commit.
+[defaults.repository_archive_urls]
+"github.com" = "https://codeload.github.com/{path}/tar.gz/{ref}"
 
 
 # Documentation search for `ccx ask`, the chat, and the agents.

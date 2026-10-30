@@ -11,6 +11,9 @@ from typing import TYPE_CHECKING
 import cloud_conversations.db.store as store
 from cloud_conversations import audit
 from cloud_conversations.config import Settings, resource_name
+from cloud_conversations.environment.install import InstallSeconds
+from cloud_conversations.environment.items import SETUP_KEYS
+from cloud_conversations.runner.validate import validate_run
 from cloud_conversations.schema.description import PLANNER_KEYS, VERIFIABLE_KEYS, Requirements
 from cloud_conversations.schema.runs import (
     SETTLED_STATES,
@@ -24,7 +27,6 @@ from cloud_conversations.steps.context import StepContext, StepError
 from cloud_conversations.steps.failure import FailureKind, RetryScope
 from cloud_conversations.steps.failure import record as record_failure
 from cloud_conversations.steps.retry import record as record_retry
-from cloud_conversations.validator.evaluate import validate_run
 
 if TYPE_CHECKING:
     from cloud_conversations.adapter.protocol import SiteDescriptor, TestbedAdapter
@@ -91,6 +93,7 @@ def build_plan(
     descriptor: SiteDescriptor,
     plan_seq: int,
     keypair: str,
+    install_s: InstallSeconds,
 ) -> Plan:
     """Build the fixed plan, raising PlanError on an unusable requirement."""
     unusable = [
@@ -146,6 +149,15 @@ def build_plan(
         ("assign_ip", {}),
         ("wait_ssh", {}),
     ]
+    software = [item.key for item in requirements.items if item.key in SETUP_KEYS]
+    if software:
+        minutes = install_s.total(software) / 60
+        if minutes > requirements.duration_hours * 60:
+            raise PlanError(
+                f"installing the software can take {minutes:.0f} minutes, longer than the "
+                f"{requirements.duration_hours}-hour lease; ask for a longer lease"
+            )
+        actions.append(("install_software", {}))
     steps = [
         PlanStep(step_id=f"step-{number:04d}", action=action, args=args)
         for number, (action, args) in enumerate(actions, start=1)
@@ -422,7 +434,7 @@ def _validate_and_settle(
             plan.site,
             rubric,
             run.connection,
-            settings.probe_s,
+            settings,
         )
     except Exception as exc:  # noqa: BLE001
         _fail(
@@ -483,7 +495,8 @@ def provision(
 
     try:
         plan = build_plan(
-            desc.requirements, rubric_kinds, run_id, descriptor, plan_seq=1, keypair=keypair
+            desc.requirements, rubric_kinds, run_id, descriptor, plan_seq=1, keypair=keypair,
+            install_s=settings.install_s,
         )
     except PlanError as exc:
         _fail(owner_id, run_id, Failure(kind="description", message=str(exc)))

@@ -178,7 +178,7 @@ export interface Job {
 
 export type Source = "stated" | "inferred" | "default" | "asked";
 
-interface Requirement {
+export interface Requirement {
   key: string;
   value: unknown;
   source: Source;
@@ -202,11 +202,13 @@ interface ImageChoice {
   testbed: string;
 }
 
-interface Check {
+export interface Check {
   id: string;
   kind: string;
+  target?: string | null;
   expected: unknown;
   comparator: string;
+  from_requirement?: string | null;
 }
 
 export interface Version {
@@ -302,9 +304,10 @@ export interface ListedFeedback {
   run_failure: Failure | null;
 }
 
-interface CheckResult {
+export interface CheckResult {
   check_id: string;
   kind: string;
+  target?: string | null;
   expected: unknown;
   actual: unknown;
   passed: boolean;

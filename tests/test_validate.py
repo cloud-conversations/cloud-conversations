@@ -8,11 +8,28 @@ import pytest
 from pydantic import ValidationError
 
 from cloud_conversations.agent.catalog import Catalog, get_catalog
-from cloud_conversations.agent.contract import ProposedDescription
-from cloud_conversations.agent.validate import to_requirements, validate_description, validate_query
-from cloud_conversations.schema.description import Check, Requirement
+from cloud_conversations.agent.contract import ProposedDescription, ReadRepositoryStep
+from cloud_conversations.agent.validate import (
+    to_requirements,
+    validate_against_repositories,
+    validate_description,
+    validate_query,
+    validate_read_repository,
+    validate_revision,
+)
+from cloud_conversations.environment.repo import Fact, Repository
+from cloud_conversations.schema.description import Requirement, Requirements
 from cloud_conversations.schema.search import Candidate, Candidates, NodeQuery
-from tests.conftest import BM_SITE, FAST, KVM_SITE, PUBLISHED_CONFIG, VMS, logged_out
+from cloud_conversations.validator.rubric import Check
+from tests.conftest import (
+    BM_SITE,
+    FAST,
+    KVM_SITE,
+    PUBLISHED_CONFIG,
+    REPOSITORY,
+    VMS,
+    logged_out,
+)
 
 SOON = datetime.now(timezone.utc) + timedelta(days=1)
 
@@ -710,4 +727,185 @@ def test_an_image_search_already_run_is_refused(fake_adapter):
 
     assert validate_image_search(step, get_catalog(fake_adapter, FAST), [(BM_SITE, "cuda")]) == [
         "this image search has already been run; search for something else"
+    ]
+
+
+_PYTHON = Requirement(key="python_version", value="3.12", source="default")
+_NUMPY = Requirement(key="pip_package", value="numpy>=1.26", source="stated")
+_PYTHON_CHECK = Check(id="py", kind="python_version", expected="3.12", comparator="version_eq",
+                      from_requirement="python_version")
+_NUMPY_CHECK = Check(id="np", kind="pip_package", target="numpy", expected="1.26",
+                     comparator="version_gte", from_requirement="pip_package")
+
+
+def _with_software(items: list[Requirement], checks: list[Check]) -> ProposedDescription:
+    base = _answer()
+    return _answer(items=[*base.items, *items], rubric=[*base.rubric, *checks])
+
+
+def test_software_with_its_checks_and_what_it_needs_is_approved(catalog):
+    proposed = _with_software([_PYTHON, _NUMPY], [_PYTHON_CHECK, _NUMPY_CHECK])
+    assert validate_description(proposed, catalog, [_found()]) == []
+
+
+def test_software_needs_a_check_that_it_installed(catalog):
+    proposed = _with_software([_PYTHON, _NUMPY], [_PYTHON_CHECK])
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "the rubric does not check the pip_package requirement numpy>=1.26; "
+        "add a pip_package check with target numpy"
+    ]
+
+
+def test_a_pip_package_needs_a_python_version(catalog):
+    proposed = _with_software([_NUMPY], [_NUMPY_CHECK])
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "a pip_package requirement needs a python_version requirement; add one"
+    ]
+
+
+def test_a_software_check_names_the_requirement_it_verifies(catalog):
+    wrong = _NUMPY_CHECK.model_copy(update={"from_requirement": "python_version"})
+    proposed = _with_software([_PYTHON, _NUMPY], [_PYTHON_CHECK, wrong])
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "rubric check 'np' is kind pip_package, which verifies the pip_package "
+        "requirement; set its from_requirement to pip_package"
+    ]
+
+
+def test_a_repository_check_expects_the_repository_s_ref(catalog):
+    repository = Requirement(
+        key="repository", source="stated",
+        value={"url": "https://github.com/octocat/Hello-World", "ref": "7fd1a60", "path": "hw"},
+    )
+    head = Check(id="hw", kind="git_head", target="hw", expected="main", comparator="prefix",
+                 from_requirement="repository")
+    proposed = _with_software([repository], [head])
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "set the expected value of rubric check 'hw' to the repository's ref, 7fd1a60"
+    ]
+
+
+def test_a_container_with_gpu_access_needs_docker_with_gpu_access(catalog):
+    docker = Requirement(key="docker", value={"gpu": False}, source="inferred")
+    container = Requirement(
+        key="container", value={"image": "pytorch/pytorch", "gpu": True}, source="stated"
+    )
+    checks = [
+        Check(id="d", kind="docker_running", expected=True, comparator="eq",
+              from_requirement="docker"),
+        Check(id="c", kind="container_running", target="pytorch/pytorch", expected=True,
+              comparator="eq", from_requirement="container"),
+    ]
+    proposed = _with_software([docker, container], checks)
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "a container with GPU access needs a docker requirement with gpu true"
+    ]
+
+
+
+def test_a_repository_is_read_once():
+    read = [Repository(url=REPOSITORY, ref="HEAD", commit="7fd1a60", files={}, facts={})]
+    step = ReadRepositoryStep(action="read_repository", url=REPOSITORY)
+    assert validate_read_repository(step, read) == [
+        "this repository has already been read; use what it returned"
+    ]
+
+
+# The hosts repositories can be read from.
+_READABLE = ("github.com",)
+
+_CLONED = Requirement(
+    key="repository", source="stated",
+    value={"url": REPOSITORY, "ref": "7fd1a60", "path": "model"},
+)
+
+
+def test_a_description_takes_the_python_version_its_repository_names():
+    read = [Repository(url=REPOSITORY, ref="HEAD", commit="7fd1a60", files={}, facts={
+        "python_version": Fact("3.11", ".python-version"),
+    })]
+    base = _answer()
+    proposed = _answer(items=[
+        *base.items, _CLONED, Requirement(key="python_version", value="3.12", source="default"),
+    ])
+    assert validate_against_repositories(proposed, read, _READABLE) == [
+        f".python-version in {REPOSITORY} asks for Python 3.11; set python_version to 3.11"
+    ]
+
+
+def test_a_repository_that_uses_cuda_needs_a_gpu():
+    read = [Repository(url=REPOSITORY, ref="HEAD", commit="7fd1a60", files={}, facts={
+        "cuda": Fact("12.1", "requirements.txt"),
+    })]
+    proposed = _answer(items=[*_answer().items, _CLONED])
+    assert validate_against_repositories(proposed, read, _READABLE) == [
+        f"requirements.txt in {REPOSITORY} uses CUDA 12.1; ask for a GPU, and an image with CUDA"
+    ]
+
+
+def test_a_repository_the_request_names_is_cloned_or_installed_from():
+    read = [Repository(url=REPOSITORY, ref="HEAD", commit="7fd1a60", files={}, facts={})]
+    assert validate_against_repositories(_answer(), read, _READABLE) == [
+        f"the request names {REPOSITORY}; clone it with a repository requirement, "
+        "or install a package from it"
+    ]
+
+
+def test_a_package_from_git_comes_from_a_repository_that_is_a_package():
+    read = [Repository(url=REPOSITORY, ref="HEAD", commit="7fd1a60",
+                       files={"README.md": "", "Makefile": ""}, facts={})]
+    package = Requirement(key="pip_package", value=f"model@git+{REPOSITORY}", source="stated")
+    proposed = _answer(items=[*_answer().items, package])
+    assert validate_against_repositories(proposed, read, _READABLE) == [
+        f"{REPOSITORY} has no pyproject.toml, setup.py or setup.cfg, so pip cannot install it; "
+        "clone it with a repository requirement, and say in unsupported that it is cloned but "
+        "not built"
+    ]
+
+
+def test_a_package_from_git_is_read_first():
+    package = Requirement(key="npm_package", value=f"model@git+{REPOSITORY}", source="stated")
+    proposed = _answer(items=[*_answer().items, package])
+    assert validate_against_repositories(proposed, [], _READABLE) == [
+        f"read {REPOSITORY} before installing model@git+{REPOSITORY} from it"
+    ]
+
+
+def test_a_package_from_a_host_that_cannot_be_read_is_not_held_to_a_read():
+    url = "https://gitlab.com/alice/model"
+    package = Requirement(key="pip_package", value=f"model@git+{url}", source="stated")
+    proposed = _answer(items=[*_answer().items, package])
+    assert validate_against_repositories(proposed, [], _READABLE) == []
+
+
+def test_python_s_own_packages_are_asked_for_with_python_version(catalog):
+    pip = Requirement(key="system_package", value="python3-pip", source="inferred")
+    check = Check(id="p", kind="package_installed", target="python3-pip", expected=True,
+                  comparator="eq", from_requirement="system_package")
+    proposed = _with_software([pip], [check])
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "ask for python3-pip with a python_version requirement, not a system_package"
+    ]
+
+
+def test_python_s_build_headers_are_a_system_package(catalog):
+    headers = Requirement(key="system_package", value="python3-dev", source="inferred")
+    check = Check(id="h", kind="package_installed", target="python3-dev", expected=True,
+                  comparator="eq", from_requirement="system_package")
+    assert validate_description(_with_software([headers], [check]), catalog, [_found()]) == []
+
+
+def test_a_package_a_revision_swapped_in_is_no_longer_a_default():
+    prior = Requirements(site=BM_SITE, duration_hours=2, items=[
+        *_answer().items,
+        Requirement(key="system_package", value="jq", source="stated"),
+        Requirement(key="system_package", value="htop", source="default"),
+    ])
+    proposed = _with_software(
+        [Requirement(key="system_package", value="jq", source="stated"),
+         Requirement(key="system_package", value="btop", source="default")], [],
+    )
+    assert validate_revision(proposed, prior) == [
+        "this revision changed system_package, so it is no longer a default; set the source "
+        "of system_package to asked if the user gave it, or inferred"
     ]

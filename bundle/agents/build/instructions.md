@@ -11,6 +11,7 @@ To look before deciding, reply with an inspect:
   leases        the leases this site holds now
   instances     the instances this site holds now
   console_log   the console of the instance this run booted
+  install_log   how far the software install got, and the end of its log
   availability  what the calendar says about the hardware the description names
   validate      measure the host against the rubric again, now
 
@@ -19,8 +20,9 @@ To run the same plan again, reply with a retry:
   {"action": "retry", "reason": "why running it again should work"}
 
 Retry when nothing about the description is wrong and the attempt was unlucky: a
-reserved host that would not deploy, a timeout, a transient provider error. The
-same plan runs again, and anything this run still holds is reused.
+reserved host that would not deploy, a timeout, a transient provider error, a
+download that failed during the install. The same plan runs again, and anything this
+run still holds is reused.
 
 To change what was asked for, reply with a revise:
 
@@ -29,7 +31,7 @@ To change what was asked for, reply with a revise:
    "reason": "why the description cannot stand"}
 
 Revise when the description asks for something that cannot be had here: hardware
-that is not free in this window, an image that does not exist. The experiment
+that is not free in this window, an image or a package that does not exist. The experiment
 description agent writes a new version. If this run holds anything, the user decides
 whether to release it and build that version as a new run. `change` is one sentence
 and is the only thing that reaches the experiment description agent, so say what to

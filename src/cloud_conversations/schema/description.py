@@ -5,7 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Literal, get_args
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
+
+from cloud_conversations.environment.items import SETUP_KEYS, SetupKey, parse
+from cloud_conversations.validator.rubric import HostKind
 
 RequirementKey = Literal[
     "node_type",  # bare-metal
@@ -20,22 +23,8 @@ RequirementKey = Literal[
     "kernel",
     "gpu_model",
     "gpu_count",
+    SetupKey,
 ]
-
-CheckKind = Literal[
-    "cpu_arch",
-    "cpu_count",
-    "mem_gb",
-    "disk_gb",
-    "os_release",
-    "kernel",
-    "dns_resolves",
-    "ssh_reachable",
-    "gpu_model",
-    "gpu_count",
-]
-
-Comparator = Literal["eq", "gte", "prefix", "contains"]
 
 ReservationKind = Literal["physical_host", "flavor_instance"]
 
@@ -68,11 +57,11 @@ def _printable(text: str) -> str:
 Note = Annotated[str, Field(max_length=MAX_NOTE), AfterValidator(_printable)]
 
 PLANNER_KEYS: frozenset[str] = frozenset(
-    {"node_type", "flavor", "count", "image_name", "os_release"}
+    {"node_type", "flavor", "count", "image_name", "os_release", *SETUP_KEYS}
 )
 
 # Check kinds that verify a requirement of the same name.
-VERIFIABLE_KEYS: frozenset[str] = frozenset(get_args(CheckKind)) & frozenset(
+VERIFIABLE_KEYS: frozenset[str] = frozenset(get_args(HostKind)) & frozenset(
     get_args(RequirementKey)
 )
 
@@ -82,6 +71,15 @@ class Requirement(BaseModel):
     value: Any
     source: Source
     rationale: Note | None = None
+
+    @model_validator(mode="after")
+    def _setup_value(self) -> Requirement:
+        if self.key in SETUP_KEYS:
+            try:
+                self.value = parse(self.key, self.value)
+            except ValueError as exc:
+                raise ValueError(f"{self.key}: {exc}") from None
+        return self
 
 
 class ImageChoice(BaseModel):
@@ -113,13 +111,3 @@ def reservation_kind_of(items: list[Requirement]) -> ReservationKind | None:
     return next(
         (RESERVATION_KINDS[i.key] for i in items if i.key in RESERVATION_KINDS), None
     )
-
-
-class Check(BaseModel):
-    """One rubric entry: a verifiable condition that defines run success."""
-
-    id: str
-    kind: CheckKind
-    expected: Any
-    comparator: Comparator
-    from_requirement: str | None = None

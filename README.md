@@ -50,7 +50,7 @@ uv run ccx provision --description-id <printed-id> --keypair <keypair-name>
 uv run ccx teardown --run-id <printed-run-id>
 ```
 
-For a VM, pass `--name vm` and `--flavor <flavor>` in place of `--node-type`.
+For a VM, pass `--name vm` and `--flavor <flavor>` in place of `--node-type`. Pass `--name software` to also install a sample set of software and check it.
 
 To describe from a prompt, and let the agent recover a failed build:
 

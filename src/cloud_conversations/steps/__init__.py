@@ -12,6 +12,7 @@ from cloud_conversations.steps.provision import (
     assign_ip,
     boot,
     ensure_keypair,
+    install_software,
     reserve,
     select_image,
     wait_ssh,
@@ -33,4 +34,5 @@ ACTIONS: dict[str, StepDef] = {
     "boot": StepDef(boot, RunState.provisioning),
     "assign_ip": StepDef(assign_ip, RunState.provisioning),
     "wait_ssh": StepDef(wait_ssh, RunState.configuring),
+    "install_software": StepDef(install_software, RunState.configuring),
 }

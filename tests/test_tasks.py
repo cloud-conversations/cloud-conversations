@@ -244,6 +244,56 @@ def test_a_build_past_its_time_limit_stops_before_recovery(
     assert recovered == []
 
 
+def test_a_build_stops_an_install_before_its_time_limit(
+    monkeypatch, owner_a, bm_requirements, bm_rubric
+):
+    from cloud_conversations.adapter.fake import FakeAdapter
+    from cloud_conversations.adapter.protocol import ExecResult
+    from cloud_conversations.environment.install import InstallSeconds
+    from cloud_conversations.schema.description import Requirement
+    from cloud_conversations.validator.rubric import Check
+    from tests.conftest import FAST
+
+    # The job may run two seconds past one SSH call, and an install may take five.
+    config = FAST.model_copy(update={
+        "service": FAST.service.model_copy(
+            update={"job_timeout_s": FAST.defaults.install_call_s + 2}
+        ),
+        "defaults": FAST.defaults.model_copy(
+            update={"install_s": InstallSeconds(system_package=5)}
+        ),
+    })
+    real = FakeAdapter.ssh_exec
+
+    def never_done(self, site, host, user, command, timeout_s):
+        if 'echo "${status:-missing}"' in command:
+            return ExecResult(stdout="running", stderr="", exit_code=0)
+        return real(self, site, host, user, command, timeout_s)
+
+    monkeypatch.setattr(FakeAdapter, "ssh_exec", never_done)
+    thread = store.create_thread(owner_a, "New chat", ssh_key_ref="cc-keypair")
+    jq = Requirement(key="system_package", value="jq", source="stated")
+    check = Check(id="jq", kind="package_installed", target="jq", expected=True,
+                  comparator="eq", from_requirement="system_package")
+    requirements = bm_requirements.model_copy(
+        update={"site": "FAKE@BM", "items": [*bm_requirements.items, jq]}
+    )
+    description_id, version = store.create_description(
+        owner_id=owner_a, conversation_id="test", requirements=requirements,
+        rubric=[*bm_rubric, check],
+    )
+    job = store.enqueue_job(
+        owner_a, thread.thread_id, "build", _approved(owner_a, description_id, version)
+    )
+
+    with pytest.raises(TimeoutError, match="resume or release its run"):
+        runs.build_experiment(job, config)
+
+    (run,) = store.runs_for_description(owner_a, description_id)
+    assert run.failure is not None
+    assert run.failure.message.startswith("the build ran out of time with the install still")
+
+
 def test_a_build_with_no_keypair_at_its_site_fails_naming_the_site(owner_a, bm_requirements):
     thread = store.create_thread(owner_a, "New chat", site_keypairs={"FAKE@KVM": "my-kvm-key"})
     description_id, version = store.create_description(

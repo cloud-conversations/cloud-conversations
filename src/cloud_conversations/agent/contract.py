@@ -9,8 +9,9 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from cloud_conversations.schema.description import Check, Note, Requirement, Source
+from cloud_conversations.schema.description import Note, Requirement, Source
 from cloud_conversations.schema.search import NodeQuery
+from cloud_conversations.validator.rubric import Check
 
 MAX_NOTES = 10
 
@@ -69,6 +70,16 @@ class ImageSearchStep(BaseModel):
     text: Note
 
 
+class ReadRepositoryStep(BaseModel):
+    """A read of a repository's setup files."""
+
+    model_config = {"extra": "forbid"}
+
+    action: Literal["read_repository"]
+    url: str
+    ref: str | None = None
+
+
 class AnswerStep(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -87,7 +98,7 @@ class DeclineStep(BaseModel):
 
 
 Step = Annotated[
-    SearchStep | KnowledgeStep | ImageSearchStep | AnswerStep | DeclineStep,
+    SearchStep | KnowledgeStep | ImageSearchStep | ReadRepositoryStep | AnswerStep | DeclineStep,
     Field(discriminator="action"),
 ]
 
@@ -109,7 +120,7 @@ class RouteStep(BaseModel):
 
 # A read the experiment agent may ask for.
 Read = Literal[
-    "leases", "instances", "console_log", "availability", "validate"
+    "leases", "instances", "console_log", "install_log", "availability", "validate"
 ]
 
 
