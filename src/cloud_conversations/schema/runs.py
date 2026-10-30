@@ -67,16 +67,6 @@ def check_transition(from_state: RunState, to_state: RunState) -> None:
         raise IllegalTransitionError(from_state, to_state)
 
 
-class CheckResult(BaseModel):
-    """Result of one rubric check, stored in the runs.results JSONB array."""
-
-    check_id: str
-    kind: str
-    expected: Any
-    actual: Any
-    passed: bool
-
-
 class Connection(BaseModel):
     """SSH endpoint once the host is ready, stored in runs.connection."""
 

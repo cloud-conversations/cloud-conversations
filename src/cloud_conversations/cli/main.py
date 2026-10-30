@@ -45,13 +45,13 @@ from cloud_conversations.config import (
     owner_id,
     testbed_of,
 )
+from cloud_conversations.environment.items import SETUP_KEYS
 from cloud_conversations.knowledge.answer import answer, as_turn
 from cloud_conversations.knowledge.errors import KnowledgeError
 from cloud_conversations.knowledge.retrieve import Retrieved, open_knowledge, usable_knowledge
 from cloud_conversations.llm.client import LLMError, build_client
 from cloud_conversations.runner import sequential
 from cloud_conversations.schema.description import (
-    Check,
     ComputeKey,
     Requirement,
     Requirements,
@@ -59,6 +59,7 @@ from cloud_conversations.schema.description import (
 )
 from cloud_conversations.schema.knowledge import Document, Knowledge, SourceState
 from cloud_conversations.schema.runs import IllegalTransitionError, RunState
+from cloud_conversations.validator.rubric import SOFTWARE_KINDS, Check
 
 log = logging.getLogger(__name__)
 
@@ -85,7 +86,47 @@ def _configure_logging() -> None:
     )
 
 
-FIXTURE_NAMES = ("baremetal", "vm")
+FIXTURE_NAMES = ("baremetal", "vm", "software")
+
+
+_SOFTWARE = [
+    Requirement(key="system_package", value="jq", source="stated"),
+    Requirement(
+        key="repository",
+        value={
+            "url": "https://github.com/octocat/Hello-World",
+            "ref": "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d",
+            "path": "Hello-World",
+        },
+        source="stated",
+    ),
+    Requirement(key="python_version", value="3.12", source="stated"),
+    Requirement(key="pip_package", value="numpy", source="stated"),
+    Requirement(key="node_version", value="22", source="stated"),
+    Requirement(key="npm_package", value="cowsay", source="stated"),
+    Requirement(key="docker", value={"gpu": False}, source="stated"),
+    Requirement(key="container", value={"image": "nginx:1.27", "ports": [80]}, source="stated"),
+]
+_SOFTWARE_CHECKS = [
+    Check(id="jq", kind="package_installed", target="jq", expected=True, comparator="eq",
+          from_requirement="system_package"),
+    Check(id="repo", kind="git_head", target="Hello-World", expected="7fd1a60",
+          comparator="prefix", from_requirement="repository"),
+    Check(id="python", kind="python_version", expected="3.12", comparator="version_eq",
+          from_requirement="python_version"),
+    Check(id="numpy", kind="pip_package", target="numpy", expected="1",
+          comparator="version_gte", from_requirement="pip_package"),
+    Check(id="node", kind="node_version", expected="22", comparator="version_eq",
+          from_requirement="node_version"),
+    Check(id="cowsay", kind="npm_package", target="cowsay", expected="1",
+          comparator="version_gte", from_requirement="npm_package"),
+    Check(id="docker", kind="docker_running", expected=True, comparator="eq",
+          from_requirement="docker"),
+    Check(id="nginx", kind="container_running", target="nginx:1.27", expected=True,
+          comparator="eq", from_requirement="container"),
+    Check(id="port", kind="port_listening", target="80", expected=True, comparator="eq",
+          from_requirement="container"),
+]
 
 
 def _fixture(name: str, settings: Settings) -> tuple[Requirements, list[Check]]:
@@ -98,6 +139,10 @@ def _fixture(name: str, settings: Settings) -> tuple[Requirements, list[Check]]:
     )
     ssh_check = Check(id="ssh", kind="ssh_reachable", expected=True, comparator="eq")
 
+    if name == "software":
+        requirements, rubric = _fixture("baremetal", settings)
+        requirements.items += [r.model_copy(deep=True) for r in _SOFTWARE]
+        return requirements, rubric + [c.model_copy(deep=True) for c in _SOFTWARE_CHECKS]
     if name == "baremetal":
         return (
             Requirements(
@@ -224,7 +269,7 @@ def cmd_describe_fixture(args: argparse.Namespace) -> int:
     requirements, rubric = _fixture(args.name, config.for_site(args.site))
 
     if args.site:
-        requirements, rubric = _for_configured_site(args, requirements)
+        requirements, rubric = _for_configured_site(args, requirements, rubric)
     else:
         requirements, rubric = _patch_fixture(args, requirements, rubric)
     if args.start_at is not None:
@@ -253,12 +298,15 @@ def cmd_describe_fixture(args: argparse.Namespace) -> int:
     print(f"compute        : {compute}")
     print(f"image_name     : {requirements.value_of('image_name')}")
     print(f"duration_hours : {requirements.duration_hours}")
+    for item in requirements.items:
+        if item.key in SETUP_KEYS:
+            print(f"software       : {item.key} {item.value}")
     if requirements.start_at is not None:
         print(f"start_at       : {requirements.start_at.isoformat()}")
     print("\nrubric         : measured on the built host; every check must pass")
     for chk in rubric:
         source = f"  from {chk.from_requirement}" if chk.from_requirement else ""
-        print(f"  {chk.id:<6} {chk.kind:<14} {chk.comparator:<6} {chk.expected!r}{source}")
+        print(f"  {chk.id:<6} {chk.fact():<14} {chk.comparator:<6} {chk.expected!r}{source}")
     return 0
 
 
@@ -292,7 +340,7 @@ def cmd_describe(args: argparse.Namespace) -> int:
     outcome, rounds = propose(
         client, catalog, args.prompt, settings,
         prior=prior, knowledge=usable_knowledge(config.knowledge, _warn),
-        testbed=testbed_of(owner), adapter=adapter,
+        testbed=testbed_of(owner), adapter=adapter, by_user=True,
     )
     if args.verbose:
         for entry in rounds:
@@ -340,6 +388,8 @@ def _progress(entry: Round) -> str:
         return f"round {entry.round}  search    {outcome}"
     if entry.action == "search_knowledge_base":
         return f"round {entry.round}  docs      {'refused' if entry.reasons else 'read'}"
+    if entry.action == "read_repository":
+        return f"round {entry.round}  repo      {'refused' if entry.reasons else 'read'}"
     if entry.action == "answer":
         return f"round {entry.round}  answer    {'accepted' if not entry.reasons else 'rejected'}"
     if entry.action == "decline":
@@ -635,7 +685,7 @@ def _source_line(name: str, state: SourceState | None, tier: str) -> str:
 
 
 def _for_configured_site(
-    args: argparse.Namespace, fixture: Requirements
+    args: argparse.Namespace, fixture: Requirements, fixture_rubric: list[Check]
 ) -> tuple[Requirements, list[Check]]:
     """Build a description for a configured site, using the fixture only as defaults."""
     site: str = args.site
@@ -664,9 +714,11 @@ def _for_configured_site(
             Requirement(key="count", value=1, source="default"),
             Requirement(key="image_name", value=image_name, source="stated"),
             Requirement(key="os_release", value=os_release, source="stated"),
+            *(i for i in fixture.items if i.key in SETUP_KEYS),
         ],
     )
     rubric = [
+        *(c for c in fixture_rubric if c.kind in SOFTWARE_KINDS),
         Check(id="arch", kind="cpu_arch", expected="x86_64", comparator="eq"),
         Check(id="os", kind="os_release", expected=os_release, comparator="prefix",
               from_requirement="os_release"),

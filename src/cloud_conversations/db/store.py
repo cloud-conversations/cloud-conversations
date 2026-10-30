@@ -15,11 +15,10 @@ from psycopg.types.json import Jsonb
 
 from cloud_conversations.config import testbed_of
 from cloud_conversations.db.conn import get_conn
-from cloud_conversations.schema.description import Check, KeypairChoice, Requirements, keypair_at
+from cloud_conversations.schema.description import KeypairChoice, Requirements, keypair_at
 from cloud_conversations.schema.events import Actor, EventKind
 from cloud_conversations.schema.knowledge import Document, Index, Passage, SourceState
 from cloud_conversations.schema.runs import (
-    CheckResult,
     Connection,
     Failure,
     Plan,
@@ -27,6 +26,7 @@ from cloud_conversations.schema.runs import (
     check_transition,
 )
 from cloud_conversations.schema.service import QUOTAS
+from cloud_conversations.validator.rubric import Check, CheckResult
 
 
 class NotFoundError(Exception):

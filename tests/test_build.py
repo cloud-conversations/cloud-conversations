@@ -23,8 +23,9 @@ from cloud_conversations.agent.validate import validate_build_step
 from cloud_conversations.audit import audited
 from cloud_conversations.config import Adapter, Config, Settings
 from cloud_conversations.runner import sequential
-from cloud_conversations.schema.description import Check, ImageChoice, Requirement, Requirements
+from cloud_conversations.schema.description import ImageChoice, Requirement, Requirements
 from cloud_conversations.schema.runs import RunState
+from cloud_conversations.validator.rubric import Check
 from cloud_conversations.worker import runs
 from tests.conftest import BARE_METAL, FAKE_SETTINGS, KINDS, TEST_DB_URL
 from tests.fakes import FailureConfig, FakeModel, FaultyAdapter, Shelf, knowledge_search

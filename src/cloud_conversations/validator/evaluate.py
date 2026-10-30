@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import uuid
+import re
 from typing import Any
 
-import cloud_conversations.db.store as store
-from cloud_conversations.schema.description import Check
-from cloud_conversations.schema.runs import CheckResult, Connection
+from cloud_conversations.validator.rubric import Check, CheckResult
 
 
 class ComparisonError(Exception):
@@ -16,6 +14,8 @@ class ComparisonError(Exception):
 
 _TRUE_WORDS = frozenset({"true", "yes", "1"})
 _FALSE_WORDS = frozenset({"false", "no", "0"})
+
+_VERSION = re.compile(r"v?([0-9]+(?:\.[0-9]+)*)")
 
 
 def _as_bool(value: Any) -> bool | None:
@@ -29,6 +29,14 @@ def _as_bool(value: Any) -> bool | None:
         if lowered in _FALSE_WORDS:
             return False
     return None
+
+
+def _version(value: Any) -> tuple[int, ...]:
+    """The numeric parts of a version: v20.11.1 -> (20, 11, 1)."""
+    match = _VERSION.match(str(value).strip())
+    if match is None:
+        raise ComparisonError(f"{value!r} is not a version")
+    return tuple(int(part) for part in match.group(1).split("."))
 
 
 def compare(comparator: str, expected: Any, actual: Any) -> bool:
@@ -56,6 +64,13 @@ def compare(comparator: str, expected: Any, actual: Any) -> bool:
         return str(actual).strip().lower().startswith(str(expected).strip().lower())
     if comparator == "contains":
         return str(expected).strip().lower() in str(actual).strip().lower()
+    if comparator == "version_eq":
+        wanted = _version(expected)
+        return _version(actual)[: len(wanted)] == wanted
+    if comparator == "version_gte":
+        wanted, seen = _version(expected), _version(actual)
+        width = max(len(wanted), len(seen))
+        return seen + (0,) * (width - len(seen)) >= wanted + (0,) * (width - len(wanted))
     raise ComparisonError(f"Unknown comparator {comparator!r}")
 
 
@@ -66,7 +81,7 @@ def evaluate_rubric(rubric: list[Check], facts: dict[str, Any]) -> list[CheckRes
     """
     results: list[CheckResult] = []
     for check in rubric:
-        actual = facts.get(check.kind)
+        actual = facts.get(check.fact())
         try:
             ok = compare(check.comparator, check.expected, actual)
         except ComparisonError:
@@ -75,49 +90,10 @@ def evaluate_rubric(rubric: list[Check], facts: dict[str, Any]) -> list[CheckRes
             CheckResult(
                 check_id=check.id,
                 kind=check.kind,
+                target=check.target,
                 expected=check.expected,
                 actual=actual,
                 passed=ok,
             )
         )
-    return results
-
-
-def validate_run(
-    run_id: uuid.UUID,
-    owner_id: str,
-    adapter: Any,
-    site: str,
-    rubric: list[Check],
-    connection: Connection,
-    probe_s: float,
-) -> list[CheckResult]:
-    """Probe the host and record the rubric's results."""
-    from cloud_conversations.validator.probe import probe_host
-
-    facts = probe_host(adapter, site, connection.host, connection.user, probe_s)
-    results = evaluate_rubric(rubric, facts)
-
-    for r in results:
-        store.append_event(
-            run_id,
-            "validator",
-            "check_observed",
-            {
-                "check_id": r.check_id,
-                "kind": r.kind,
-                "expected": r.expected,
-                "actual": r.actual,
-                "passed": r.passed,
-            },
-        )
-
-    failed = [r.check_id for r in results if not r.passed]
-    store.update_run(owner_id, run_id, results=results)
-    store.append_event(
-        run_id,
-        "validator",
-        "validation_completed",
-        {"checks": len(results), "failed": failed},
-    )
     return results

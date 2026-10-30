@@ -78,7 +78,7 @@ Prompts and testbed guidance are in `bundle/`. Set `bundle_dir` under `[service]
 |---|---|
 | `agents/<agent>/<name>.md` | a prompt. `{testbed}` becomes the testbed's `label`, and `{about}` the text of `testbeds/<testbed>/about.md`. |
 | `testbeds/<testbed>/about.md` | one line that names and describes the testbed |
-| `testbeds/<testbed>/guidance/hardware.md`, `image.md` | rules the describe agent gets for that stage |
+| `testbeds/<testbed>/guidance/hardware.md`, `image.md`, `software.md` | rules the describe agent gets for that stage |
 
 ## Model
 
@@ -104,7 +104,7 @@ Decline anything that would run longer than a working day.
 |---|---|---|
 | `host`, `port` | `127.0.0.1`, 8000 | the address `ccx api` binds. `--host` and `--port` override them. |
 | `broker_url` | `redis://localhost:6379/0` | Celery's broker. `CC_BROKER_URL` overrides it. |
-| `job_timeout_s` | 5400 | seconds a job may run. A chat build must have time to start its lease, boot and reach SSH within this. |
+| `job_timeout_s` | 5400 | seconds a job may run. A chat build must have time to start its lease, boot, reach SSH and install its software within this. |
 | `route_history` | 6 | recent messages in the chat that the router reads |
 | `thread_title_chars` | 60 | characters of the first message to use as a chat's title |
 | `oidc_scope` | `openid profile email` | scopes to request from the login provider at login |

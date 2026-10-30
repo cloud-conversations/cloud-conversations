@@ -11,6 +11,8 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
+from cloud_conversations.environment.install import HomeFolder, HttpsUrl, InstallSeconds
+from cloud_conversations.environment.repo import ArchiveUrl
 from cloud_conversations.schema.description import Requirements, ReservationKind
 from cloud_conversations.schema.images import ImageRules
 from cloud_conversations.schema.knowledge import Knowledge
@@ -94,6 +96,26 @@ class Settings(BaseModel):
     read_retry_s: float = Field(default=5.0, ge=0)
     directory_api_s: float = Field(default=15.0, gt=0)
     probe_s: float = Field(default=60.0, gt=0)
+    install_s: InstallSeconds = InstallSeconds()
+    install_poll_interval_s: float = Field(default=15.0, gt=0)
+    install_call_s: float = Field(default=60.0, gt=0)
+    install_log_lines: int = Field(default=40, ge=1)
+    install_lock_s: int = Field(default=600, ge=1)
+    venv_dir: HomeFolder = "venv"
+    uv_url: HttpsUrl = "https://github.com/astral-sh/uv/releases/download/0.12.5"
+    node_dist_url: HttpsUrl = "https://nodejs.org/dist"
+    docker_rpm_repo_url: HttpsUrl = "https://download.docker.com/linux/centos/docker-ce.repo"
+    nvidia_toolkit_url: HttpsUrl = "https://nvidia.github.io/libnvidia-container/stable"
+    pypi_url: HttpsUrl = "https://pypi.org/pypi"
+    npm_registry_url: HttpsUrl = "https://registry.npmjs.org"
+    docker_registry_url: HttpsUrl = "https://registry-1.docker.io"
+    registry_s: float = Field(default=15.0, gt=0)
+    # Where to download a repository's archive, by host.
+    repository_archive_urls: dict[str, ArchiveUrl] = {
+        "github.com": "https://codeload.github.com/{path}/tar.gz/{ref}"
+    }
+    repository_bytes: int = Field(default=50_000_000, ge=1)
+    repository_file_chars: int = Field(default=6000, ge=1)
     max_lease_hours: int = Field(default=168, ge=1)
     max_gpu_lease_hours: int = Field(default=168, ge=1)
     max_lead_days: int = Field(default=14, ge=0)
@@ -284,9 +306,10 @@ class Config(BaseModel):
         merged = self.defaults.model_dump()
         layers = self._layers(site, kind) if site else []
         for layer in [*layers, self.overrides]:
-            merged.update(
-                {k: v for k, v in layer.items() if k in Settings.model_fields}
-            )
+            merged.update({
+                k: {**merged[k], **v} if isinstance(v, dict) and isinstance(merged[k], dict) else v
+                for k, v in layer.items() if k in Settings.model_fields
+            })
         return _validate(Settings, merged, f"settings for {site}")
 
     def facts_for(self, site: str) -> SiteFacts:

@@ -17,6 +17,7 @@ from cloud_conversations.adapter.fake import (
 )
 from cloud_conversations.adapter.protocol import SiteDescriptor
 from cloud_conversations.config import KindFacts
+from cloud_conversations.environment.install import InstallSeconds
 from cloud_conversations.runner import sequential
 from cloud_conversations.schema.runs import RunState
 from tests.conftest import BARE_METAL, BM_SITE, FAST, KVM_SITE
@@ -194,7 +195,8 @@ def test_requirement_nothing_can_act_on_is_rejected(owner_a, bm_requirements, bm
 
 
 def test_requirement_bound_to_a_check_is_accepted(owner_a, bm_requirements, bm_rubric):
-    from cloud_conversations.schema.description import Check, Requirement
+    from cloud_conversations.schema.description import Requirement
+    from cloud_conversations.validator.rubric import Check
 
     bm_requirements.items.append(Requirement(key="mem_gb", value=64, source="stated"))
     bm_rubric.append(
@@ -289,6 +291,7 @@ def test_resume_rewinds_from_any_interrupted_phase(
         fake_adapter.capabilities().site(BM_SITE),
         1,
         keypair=FAKE_KEYPAIR,
+        install_s=InstallSeconds(),
     )
     store.update_run(owner_a, run_id, plan=plan)
     for state in (RunState.provisioning, RunState.configuring, RunState.validating):
@@ -335,7 +338,7 @@ def test_a_host_unreachable_at_validation_still_records_a_result_set(
 
     adapter = FakeAdapter(sites=default_fake_sites(), config=FAST)
     real_ssh = adapter.ssh_exec
-    marker = build_probe_script(DEFAULT_DNS_PROBE_HOST).splitlines()[0]
+    marker = build_probe_script(DEFAULT_DNS_PROBE_HOST, "venv", []).splitlines()[0]
 
     def flaky_ssh(site, host, user, command, timeout_s):
         if command.strip().startswith(marker):
@@ -838,6 +841,7 @@ def test_a_start_time_reaches_the_reserve_step(bm_requirements, bm_rubric, fake_
         fake_adapter.capabilities().site(BM_SITE),
         1,
         keypair=FAKE_KEYPAIR,
+        install_s=InstallSeconds(),
     )
 
     (reserve,) = [s for s in plan.steps if s.action == "reserve"]
@@ -854,6 +858,7 @@ def test_no_start_time_leaves_the_reserve_step_to_choose(
         fake_adapter.capabilities().site(BM_SITE),
         1,
         keypair=FAKE_KEYPAIR,
+        install_s=InstallSeconds(),
     )
     (reserve,) = [s for s in plan.steps if s.action == "reserve"]
     assert reserve.args["start_at"] is None

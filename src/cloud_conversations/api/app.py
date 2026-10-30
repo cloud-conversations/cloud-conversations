@@ -587,14 +587,14 @@ def _one_keypair(
 ) -> dict[str, None]:
     """Clear one keypair field if changes sets the other.
 
-    Raises 422 if the keypairs at sites do not name one at each site of the testbed.
+    Raises 422 unless the keypairs at sites name one or more of the testbed's sites.
     """
     named = changes.get(at_sites)
     if named is not None:
         sites = config().sites_at(caller.testbed)
-        if set(named) != set(sites) or not all(name.strip() for name in named.values()):
+        if not named or not set(named) <= set(sites) or not all(n.strip() for n in named.values()):
             raise HTTPException(
-                status_code=422, detail=f"pick one keypair at each of {', '.join(sites)}"
+                status_code=422, detail=f"pick a keypair at one or more of {', '.join(sites)}"
             )
         return {imported: None}
     return {at_sites: None} if changes.get(imported) is not None else {}

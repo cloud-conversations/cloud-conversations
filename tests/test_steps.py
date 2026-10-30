@@ -14,7 +14,8 @@ import pytest
 import cloud_conversations.db.store as store
 from cloud_conversations.adapter.fake import FakeAdapter, FakeInstance, default_fake_sites
 from cloud_conversations.adapter.protocol import Image
-from cloud_conversations.schema.description import Check, ImageChoice, Requirement
+from cloud_conversations.config import Settings
+from cloud_conversations.schema.description import ImageChoice, Requirement
 from cloud_conversations.steps.context import StepContext, StepError
 from cloud_conversations.steps.idempotency import derive_key
 from cloud_conversations.steps.provision import (
@@ -26,6 +27,7 @@ from cloud_conversations.steps.provision import (
 )
 from cloud_conversations.validator.evaluate import ComparisonError, compare, evaluate_rubric
 from cloud_conversations.validator.probe import parse_probe_output
+from cloud_conversations.validator.rubric import Check
 from tests.conftest import BM_SITE, FAST, KVM_SITE
 
 _SRC = Path(__file__).resolve().parent.parent / "src"
@@ -295,6 +297,9 @@ def test_parse_probe_output_ignores_junk():
         ("gte", 24, 24, True),
         ("prefix", "Ubuntu 22.04", "Ubuntu 22.04.4 LTS", True),
         ("prefix", "Ubuntu 24", "Ubuntu 22.04", False),
+        ("version_gte", "3.9", "3.10.4", True),
+        ("version_eq", "3.11", "3.11.9", True),
+        ("version_eq", "3.1", "3.11.9", False),
     ],
 )
 def test_compare(comparator, expected, actual, want):
@@ -331,45 +336,46 @@ def test_evaluate_rubric_records_what_was_seen():
 def test_probe_reports_facts_from_the_booted_node_type(
     owner_a, bm_requirements, bm_rubric, fake_adapter
 ):
-    from cloud_conversations.validator.probe import probe_host
+    from cloud_conversations.runner.validate import probe_host
 
     run_id, ctx = _reserved(owner_a, bm_requirements, bm_rubric, fake_adapter)
     ctx.outputs.update(boot(ctx, {"step_id": "s4", "name": f"cc-{run_id}"}))
     fake_adapter.wait_instance_active(BM_SITE, ctx.outputs["instance_id"], 1.0)
     ctx.outputs.update(assign_ip(ctx, {"step_id": "s5"}))
 
-    facts = probe_host(fake_adapter, BM_SITE, ctx.outputs["host"], "cc", 5.0)
+    facts = probe_host(fake_adapter, BM_SITE, ctx.outputs["host"], "cc", [], Settings(probe_s=5.0))
     assert facts["cpu_count"] == 48  # from the FAKE@BM catalog
     assert facts["ssh_reachable"] is True
 
 
 def test_probe_reports_kvm_flavor_facts(owner_a, kvm_requirements, kvm_rubric, fake_adapter):
-    from cloud_conversations.validator.probe import probe_host
+    from cloud_conversations.runner.validate import probe_host
 
     run_id, ctx = _reserved(owner_a, kvm_requirements, kvm_rubric, fake_adapter, KVM_SITE)
     ctx.outputs.update(boot(ctx, {"step_id": "s4", "name": f"cc-{run_id}"}))
     fake_adapter.wait_instance_active(KVM_SITE, ctx.outputs["instance_id"], 1.0)
     ctx.outputs.update(assign_ip(ctx, {"step_id": "s5"}))
 
-    facts = probe_host(fake_adapter, KVM_SITE, ctx.outputs["host"], "cc", 5.0)
+    facts = probe_host(fake_adapter, KVM_SITE, ctx.outputs["host"], "cc", [], Settings(probe_s=5.0))
     assert facts["cpu_count"] == 4  # m1.large
 
 
 def test_probe_on_an_unreachable_host_reports_it(fake_adapter):
-    from cloud_conversations.validator.probe import probe_host
+    from cloud_conversations.runner.validate import probe_host
 
-    assert probe_host(fake_adapter, BM_SITE, "203.0.113.1", "cc", 5.0) == {"ssh_reachable": False}
+    facts = probe_host(fake_adapter, BM_SITE, "203.0.113.1", "cc", [], Settings(probe_s=5.0))
+    assert facts == {"ssh_reachable": False}
 
 
 def test_probe_does_not_swallow_a_bug(fake_adapter, monkeypatch):
-    from cloud_conversations.validator.probe import probe_host
+    from cloud_conversations.runner.validate import probe_host
 
     def explode(*_a, **_k):
         raise RuntimeError("kaboom")
 
     monkeypatch.setattr(fake_adapter, "ssh_exec", explode)
     with pytest.raises(RuntimeError, match="kaboom"):
-        probe_host(fake_adapter, BM_SITE, "203.0.113.1", "cc", 5.0)
+        probe_host(fake_adapter, BM_SITE, "203.0.113.1", "cc", [], Settings(probe_s=5.0))
 
 
 def test_boot_attaches_a_security_group_only_where_enforced(
@@ -415,7 +421,7 @@ def test_kvm_ssh_is_refused_without_a_security_group(
 
 def test_the_dns_check_resolves_the_site_s_own_probe_host(fake_adapter, monkeypatch):
     from cloud_conversations.adapter.protocol import ExecResult
-    from cloud_conversations.validator.probe import probe_host
+    from cloud_conversations.runner.validate import probe_host
 
     site = fake_adapter.capabilities().sites[0]
     site.dns_probe_host = "resolver.internal"
@@ -426,7 +432,7 @@ def test_the_dns_check_resolves_the_site_s_own_probe_host(fake_adapter, monkeypa
         return ExecResult(stdout="dns_resolves=true", stderr="", exit_code=0)
 
     monkeypatch.setattr(fake_adapter, "ssh_exec", capture)
-    facts = probe_host(fake_adapter, site.site, "10.0.0.1", "cc", 5.0)
+    facts = probe_host(fake_adapter, site.site, "10.0.0.1", "cc", [], Settings(probe_s=5.0))
 
     assert facts["dns_resolves"] is True
     assert "getent hosts resolver.internal" in seen[0]
@@ -445,7 +451,8 @@ def test_the_fake_answers_the_probe_the_real_validator_would_send():
         node_type="compute_skylake", run_id=None,
     )
     result = adapter.ssh_exec(
-        BM_SITE, "10.0.0.9", "cc", build_probe_script(site.dns_probe_host), timeout_s=1.0
+        BM_SITE, "10.0.0.9", "cc", build_probe_script(site.dns_probe_host, "venv", []),
+        timeout_s=1.0,
     )
     assert result.exit_code == 0, result.stderr
     assert "cpu_arch=" in result.stdout

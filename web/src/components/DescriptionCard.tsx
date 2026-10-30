@@ -1,5 +1,7 @@
 import type { Source, Version } from "../api/types";
+import { isSoftware, isSoftwareCheck, shown } from "../software";
 import { stamp } from "../time";
+import { SoftwareRequirements } from "./Software";
 
 interface Props {
   version: Version;
@@ -30,10 +32,6 @@ function Row({
   );
 }
 
-function shown(value: unknown): string {
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
 export function DescriptionCard({
   version,
   latest,
@@ -47,6 +45,9 @@ export function DescriptionCard({
   const image = req.image;
   const support = image && `${image.supported ? "" : "not "}supported by ${image.testbed}`;
   const named = req.items.some((item) => item.key === "image_name" && item.value === image?.name);
+  const software = req.items.filter(isSoftware);
+  const hardwareChecks = version.rubric.filter((check) => !isSoftwareCheck(check));
+  const softwareChecks = version.rubric.length - hardwareChecks.length;
 
   return (
     <div className="bg-white border border-grey-light rounded-lg overflow-hidden">
@@ -78,9 +79,9 @@ export function DescriptionCard({
             }
             source={req.start_source}
           />
-          {req.items.map((item) => (
+          {req.items.filter((item) => !isSoftware(item)).map((item, index) => (
             <Row
-              key={item.key}
+              key={`${item.key}-${index}`}
               name={item.key}
               value={
                 item.key === "image_name" && named
@@ -96,16 +97,32 @@ export function DescriptionCard({
         </tbody>
       </table>
 
+      {software.length > 0 && (
+        <div className="py-2 border-b border-grey-light">
+          <p className="px-4 text-xs font-semibold text-grey uppercase tracking-wide mb-1">
+            Software · installed after boot, each with its checks
+          </p>
+          <SoftwareRequirements items={software} rubric={version.rubric} />
+        </div>
+      )}
+
       <div className="px-4 py-3 border-b border-grey-light">
         <p className="text-xs font-semibold text-grey uppercase tracking-wide mb-1">
           Rubric · every check must pass on the built host
         </p>
         <ul className="text-sm space-y-0.5">
-          {version.rubric.map((check) => (
+          {hardwareChecks.map((check) => (
             <li key={check.id} className="font-mono text-xs">
-              {check.kind} {check.comparator} {shown(check.expected)}
+              {check.kind} {check.target && `${check.target} `}{check.comparator}{" "}
+              {shown(check.expected)}
             </li>
           ))}
+          {softwareChecks > 0 && (
+            <li className="text-xs text-grey">
+              and {softwareChecks} software check{softwareChecks === 1 ? "" : "s"}, listed with
+              the software above
+            </li>
+          )}
         </ul>
       </div>
 

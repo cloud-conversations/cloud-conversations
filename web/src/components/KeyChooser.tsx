@@ -105,14 +105,15 @@ function SiteForm({
   const profile = useProfile();
   const sites = profile.data?.sites ?? [];
   const [chosen, setChosen] = useState(initial);
-  const ready = sites.length > 0 && sites.every((site) => chosen[site]);
+  const picked = Object.fromEntries(Object.entries(chosen).filter(([, name]) => name));
+  const ready = Object.keys(picked).length > 0;
 
   return (
     <form
       className="mt-2 flex flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready) save({ site_keypairs: chosen });
+        if (ready) save({ site_keypairs: picked });
       }}
     >
       {sites.map((site) => (

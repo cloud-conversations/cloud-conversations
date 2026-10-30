@@ -51,6 +51,43 @@ function show(over: Partial<Parameters<typeof DescriptionCard>[0]> = {}) {
 }
 
 describe("a description card", () => {
+  it("folds the software into one line per group, and opens a group to show each check", async () => {
+    const warned = vi.spyOn(console, "error").mockImplementation(() => {});
+    show({
+      version: {
+        ...VERSION,
+        requirements: {
+          ...VERSION.requirements,
+          items: [
+            ...VERSION.requirements.items,
+            { key: "system_package", value: "jq", source: "stated" },
+            { key: "system_package", value: "git", source: "inferred" },
+            { key: "python_version", value: "3.12", source: "default" },
+            { key: "pip_package", value: "numpy", source: "stated" },
+          ],
+        },
+        rubric: [
+          ...VERSION.rubric,
+          {
+            id: "np", kind: "pip_package", target: "numpy", expected: "1",
+            comparator: "version_gte", from_requirement: "pip_package",
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "System packages 2 · jq, git · 1 inferred" }))
+      .toBeInTheDocument();
+    expect(screen.queryByText("pip_package numpy version_gte 1")).not.toBeInTheDocument();
+    expect(screen.getByText(/and 1 software check, listed with/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Python 3.12 1 · numpy · 1 default" }));
+
+    expect(screen.getByText("pip_package numpy version_gte 1")).toBeInTheDocument();
+    expect(warned).not.toHaveBeenCalled();
+    warned.mockRestore();
+  });
+
   it("shows each requirement with its source, each check, and what the testbed cannot do", () => {
     show();
 

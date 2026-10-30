@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import math
 import os
 import re
+import tarfile
 import urllib.request
 import zlib
 from collections.abc import Generator
@@ -26,8 +28,9 @@ from cloud_conversations.adapter.fake import FakeAdapter, FakeSite, default_fake
 from cloud_conversations.adapter.protocol import SiteDescriptor
 from cloud_conversations.config import CONFIG_FILE_ENV, Adapter, Config, KindFacts, Settings
 from cloud_conversations.knowledge import retrieve
-from cloud_conversations.schema.description import Check, Requirement, Requirements
+from cloud_conversations.schema.description import Requirement, Requirements
 from cloud_conversations.schema.images import ImageRules
+from cloud_conversations.validator.rubric import Check
 
 TEST_DB_URL: str = os.environ.get(
     "CC_TEST_DATABASE_URL",
@@ -359,6 +362,56 @@ def _no_network(monkeypatch):
         return real(url, *args, **kwargs)
 
     monkeypatch.setattr(urllib.request, "urlopen", guarded)
+
+
+# A repository the archive fixture serves, the commit HEAD is at, and the commit of its
+# branch "next".
+REPOSITORY = "https://github.com/alice/model"
+COMMIT = "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d"
+NEXT = "553c2077f0edc3d5dc5d17262f6aa498e69d6f8e"
+_ARCHIVE = "https://codeload.github.com/alice/model/tar.gz/{}"
+_REFS = f"{REPOSITORY}/info/refs?service=git-upload-pack"
+
+
+def refs_reply(refs: dict[str, str]) -> bytes:
+    """A git info/refs reply naming each ref, HEAD or refs/heads/<name>, at its commit."""
+
+    def pkt(line: str) -> bytes:
+        return f"{len(line) + 4:04x}".encode() + line.encode()
+
+    lines = [f"{commit} {name}\n" for name, commit in refs.items()]
+    lines[0] = lines[0].replace("\n", "\0multi_ack symref=HEAD:refs/heads/main\n")
+    return pkt("# service=git-upload-pack\n") + b"0000" + b"".join(map(pkt, lines)) + b"0000"
+
+
+class _Archive(io.BytesIO):
+    status = 200
+
+
+@pytest.fixture()
+def archive(monkeypatch):
+    """Serve one repository archive from a dict of files, and pass every other request on."""
+    served: dict[str, bytes] = {}
+    guarded = urllib.request.urlopen
+
+    def urlopen(request, *args, **kwargs):
+        url = request if isinstance(request, str) else request.full_url
+        return _Archive(served[url]) if url in served else guarded(request, *args, **kwargs)
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+
+    def serve(files: dict[str, str]) -> None:
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+            for path, text in files.items():
+                data = text.encode()
+                info = tarfile.TarInfo(f"model-HEAD/{path}")
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+        served[_ARCHIVE.format(COMMIT)] = served[_ARCHIVE.format(NEXT)] = buffer.getvalue()
+        served[_REFS] = refs_reply({"HEAD": COMMIT, "refs/heads/next": NEXT})
+
+    return serve
 
 
 @pytest.fixture(autouse=True)

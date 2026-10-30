@@ -187,6 +187,7 @@ def _describe(
         baremetal_site=baremetal_site,
         testbed=testbed_of(thread.owner_id),
         adapter=adapter,
+        by_user=True,
     )
     transcript = [t.model_dump(mode="json") for t in rounds]
 

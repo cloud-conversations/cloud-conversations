@@ -89,6 +89,24 @@ describe("a run card", () => {
     expect(screen.getByText("wanted 24, got 12")).toBeInTheDocument();
   });
 
+  it("groups the software checks, and opens a group with a failure", async () => {
+    serve({
+      ...PASSED,
+      results: [
+        { check_id: "jq", kind: "package_installed", target: "jq", expected: true, actual: true,
+          passed: true },
+        { check_id: "np", kind: "pip_package", target: "numpy", expected: "1", actual: null,
+          passed: false },
+      ],
+    });
+
+    expect(await screen.findByRole("button", { name: "System packages 1 of 1 passed" }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Python 0 of 1 passed" }))
+      .toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("pip_package numpy")).toBeInTheDocument();
+  });
+
   it("reads the event stream back as a timeline", async () => {
     serve(PASSED);
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from cloud_conversations.config import load_config
 
 # The stages a testbed can give guidance for.
-GUIDANCE_STAGES = ("hardware", "image")
+GUIDANCE_STAGES = ("hardware", "image", "software")
 
 
 class BundleError(Exception):

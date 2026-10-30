@@ -67,6 +67,13 @@ def test_run_baremetal_end_to_end(monkeypatch, capsys, owner_env):
     assert "state   passed" in out
 
 
+def test_run_software_installs_and_checks_it(monkeypatch, capsys, owner_env):
+    code, msg = _main(["run", "--fixture", "software"], monkeypatch)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "check   [PASS] numpy: expected '1', got '1.0.0'" in out.splitlines()
+
+
 def test_run_vm_end_to_end(monkeypatch, capsys, owner_env):
     code, msg = _main(["run", "--fixture", "vm"], monkeypatch)
     out = capsys.readouterr().out
@@ -910,7 +917,7 @@ def test_describe_revises_an_existing_lineage(monkeypatch, capsys, owner_env, de
 
     with describe_env([
         _describe_reply("search", duration_hours=4, intent="four hours"),
-        _describe_reply("answer", duration_hours=4),
+        _describe_reply("answer", duration_hours=4, duration_source="stated"),
     ]):
         code, msg = _main(
             ["describe", "make it four hours", "--description-id", desc_id],

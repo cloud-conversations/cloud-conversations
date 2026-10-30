@@ -8,8 +8,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field, model_validator
 
-from cloud_conversations.schema.description import Check, Requirements
-from cloud_conversations.schema.runs import CheckResult, Connection, Failure, RunState
+from cloud_conversations.schema.description import Requirements
+from cloud_conversations.schema.runs import Connection, Failure, RunState
+from cloud_conversations.validator.rubric import Check, CheckResult
 
 MAX_MESSAGE_CHARS = 4000
 MAX_PUBLIC_KEY_CHARS = 8000

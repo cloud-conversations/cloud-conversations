@@ -151,16 +151,27 @@ def test_an_expired_session_is_told_to_log_in(client, dispatched):
     assert refused.status_code == 401
 
 
-def test_a_chat_takes_one_keypair_at_each_site(client):
+def test_a_chat_takes_keypairs_at_some_of_its_sites(client):
+    thread_id = _thread(client)
+
+    saved = client.patch(
+        f"/threads/{thread_id}", json={"site_keypairs": {"CHI@UC": "my-uc-key"}}, headers=ALICE
+    )
+
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["site_keypairs"] == {"CHI@UC": "my-uc-key"}
+
+
+def test_a_chat_refuses_a_keypair_at_a_site_the_testbed_lacks(client):
     thread_id = _thread(client)
 
     refused = client.patch(
-        f"/threads/{thread_id}", json={"site_keypairs": {"CHI@UC": "my-uc-key"}}, headers=ALICE
+        f"/threads/{thread_id}", json={"site_keypairs": {"CHI@NOWHERE": "k"}}, headers=ALICE
     )
 
     sites = ", ".join(config().sites_at("chameleon"))
     assert refused.status_code == 422
-    assert refused.json() == {"detail": f"pick one keypair at each of {sites}"}
+    assert refused.json() == {"detail": f"pick a keypair at one or more of {sites}"}
 
 
 def test_keypairs_at_each_site_and_an_imported_key_replace_each_other(client):

@@ -222,7 +222,8 @@ def test_building_a_version_again_puts_it_back_without_revising_it(
     _exchange(
         monkeypatch, owner_a, store.get_thread(owner_a, thread.thread_id),
         "make it 4 hours",
-        [_route("revise"), search_reply(duration_hours=4), answer_reply(duration_hours=4)],
+        [_route("revise"), search_reply(duration_hours=4),
+         answer_reply(duration_hours=4, duration_source="stated")],
     )
     store.finish_job(store.unfinished_jobs(owner_a, thread.thread_id)[0].job_id)
 
@@ -251,7 +252,8 @@ def test_a_revision_that_changes_nothing_says_so_and_writes_no_version(
     message, _ = _exchange(
         monkeypatch, owner_a, store.get_thread(owner_a, thread.thread_id),
         "can it start in 10 minutes?",
-        [_route("revise"), search_reply(), answer_reply(start_at=_tomorrow()), answer_reply()],
+        [_route("revise"), search_reply(), answer_reply(start_at=_tomorrow(), start_source="asked"),
+         answer_reply()],
     )
 
     assert message.kind == "notice"

@@ -7,7 +7,8 @@ import uuid
 import pytest
 
 import cloud_conversations.db.store as store
-from cloud_conversations.schema.description import Check, Requirement, Requirements
+from cloud_conversations.schema.description import Requirement, Requirements
+from cloud_conversations.validator.rubric import Check
 
 
 @pytest.fixture()

@@ -19,6 +19,7 @@ from cloud_conversations.llm.client import LLMError, build_client
 from cloud_conversations.runner import sequential
 from cloud_conversations.schema.description import reservation_kind_of
 from cloud_conversations.schema.runs import RunState
+from cloud_conversations.steps.context import finishing_by
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def build_experiment(job: Job, config: Config) -> None:
     if not site:
         raise ValueError(f"description {description_id} v{version} names no site")
 
-    deadline = time.monotonic() + config.service.job_timeout_s
+    started = time.monotonic()
     thread = store.get_thread(owner, job.thread_id)
     keypair = keypair_for(owner, old, site) if old is not None else thread.keypair_at(site)
     if keypair is None:
@@ -46,8 +47,10 @@ def build_experiment(job: Job, config: Config) -> None:
     user = user_scope(owner, old.project_id if old is not None else thread.project_id)
     adapter = credentials.build_adapter(site, config, user)
     settings = config.for_site(site, reservation_kind_of(desc.requirements.items))
+    # The job's time limit, less one SSH call.
+    stop_by = started + config.service.job_timeout_s - settings.install_call_s
     request_id = uuid.UUID(str(job.payload["request_id"]))
-    with audit.acting(owner, request_id):
+    with audit.acting(owner, request_id), finishing_by(stop_by):
         if old is not None:
             _release(job, config, old.run_id, request_id)
             run_id = build_replacement(
@@ -66,10 +69,10 @@ def build_experiment(job: Job, config: Config) -> None:
             )
         if store.get_run(owner, run_id).state == RunState.passed:
             return
-        if time.monotonic() >= deadline:
+        if time.monotonic() >= stop_by:
             raise TimeoutError(
                 f"the build ran past job_timeout_s ({config.service.job_timeout_s:g}s); "
-                "release its run from the chat"
+                "resume or release its run from the chat"
             )
 
         try:
