@@ -241,11 +241,13 @@ class LimitOut(BaseModel):
 
 class AdminSettingsOut(BaseModel):
     require_approval: bool
+    paused: bool
     limits: list[LimitOut]
 
 
 class AdminSettingsPatch(BaseModel):
     require_approval: bool | None = None
+    paused: bool | None = None
     # null clears an override.
     max_messages_per_day: int | None = Field(default=None, ge=1)
     max_builds_per_user: int | None = Field(default=None, ge=1)
@@ -260,6 +262,20 @@ class UserPatch(BaseModel):
     max_messages_per_day: int | None = Field(default=None, ge=1)
     max_builds_per_user: int | None = Field(default=None, ge=1)
     max_active_experiments_per_user: int | None = Field(default=None, ge=1)
+
+
+class JobInProgressOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    job_id: uuid.UUID
+    kind: str
+    state: str
+    username: str
+    title: str
+    site: str | None
+    run_state: str | None
+    created_at: datetime
+    started_at: datetime | None
 
 
 class AnnouncementOut(BaseModel):

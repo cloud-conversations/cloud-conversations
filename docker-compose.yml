@@ -2,7 +2,6 @@ x-service: &service
   build: .
   environment:
     DATABASE_URL: postgresql://dev:dev@db:5432/cloudconversations
-    CC_BROKER_URL: redis://redis:6379/0
     CC_LLM_BASE_URL: ${CC_LLM_BASE_URL:-}
     CC_LLM_API_KEY: ${CC_LLM_API_KEY:-}
     CC_LLM_MODEL: ${CC_LLM_MODEL:-}
@@ -38,16 +37,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "127.0.0.1:6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   migrate:
     build: .
     entrypoint: ["alembic", "upgrade", "head"]
@@ -66,21 +55,13 @@ services:
 
   worker-chat:
     <<: *service
-    entrypoint: ["celery", "-A", "cloud_conversations.worker.app", "worker", "-Q", "chat", "-c", "1", "--loglevel", "${CC_LOG_LEVEL:-warning}"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+    command: ["worker", "--queue", "chat"]
 
   worker-runs:
     <<: *service
-    entrypoint: ["celery", "-A", "cloud_conversations.worker.app", "worker", "-Q", "runs", "-c", "${CC_RUNS_CONCURRENCY:-2}", "--loglevel", "${CC_LOG_LEVEL:-warning}"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+    command: ["worker", "--queue", "runs"]
+    deploy:
+      replicas: ${CC_RUNS_CONCURRENCY:-2}
 
   web:
     build: ./web

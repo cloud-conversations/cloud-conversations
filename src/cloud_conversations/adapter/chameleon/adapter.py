@@ -49,6 +49,7 @@ from cloud_conversations.adapter.errors import (
     TransientError,
     UnschedulableError,
 )
+from cloud_conversations.adapter.planned import made_earlier
 from cloud_conversations.adapter.protocol import (
     AvailabilityWindow,
     Capabilities,
@@ -577,6 +578,13 @@ class ChameleonAdapter:
         existing = store.resource_by_idempotency_key(idempotency_key)
         if existing is not None:
             return self.get_lease(site, existing.provider_id)
+        made = made_earlier(self, site, "lease", run_id, idempotency_key)
+        if made is not None:
+            lease = self.get_lease(site, made)
+            store.create_resource_with_event(
+                run_id, made, "lease", site, lease.end, idempotency_key=idempotency_key
+            )
+            return lease
 
         t_start = start or (_now_utc() + timedelta(minutes=2))
         t_end = t_start + timedelta(hours=duration_hours)
@@ -745,6 +753,38 @@ class ChameleonAdapter:
                 return None
         return None
 
+    def find_planned(
+        self, site: str, kind: str, run_id: uuid.UUID, idempotency_key: str
+    ) -> str | None:
+        recorded = store.recorded_provider_ids(run_id, kind)
+        with self._ctx(site, "find_planned"):
+            try:
+                made = self._tagged(site, kind, run_id, idempotency_key)
+            except Exception as exc:
+                raise self._map_provider_error(exc, kind, idempotency_key) from exc
+        return next((m for m in made if m not in recorded), None)
+
+    def _tagged(
+        self, site: str, kind: str, run_id: uuid.UUID, idempotency_key: str
+    ) -> list[str]:
+        """Ids of the run's resources of this kind at the provider."""
+        if kind == "lease":
+            leases = chi.lease.blazar(self._session(site)).lease.list()
+            return [r["id"] for r in leases if r.get("name") == resource_name(run_id)]
+        if kind == "instance":
+            servers = chi.server.nova(self._session(site)).servers.list()
+            return [s.id for s in servers if s.metadata.get("cc_ikey") == idempotency_key]
+        neutron = chi.network.neutron(self._session(site))
+        if kind == "security_group":
+            groups = neutron.list_security_groups(name=resource_name(run_id))["security_groups"]
+            return [g["id"] for g in groups]
+        if kind == "floating_ip":
+            fips = neutron.list_floatingips()["floatingips"]
+            return [
+                f["floating_ip_address"] for f in fips if f.get("description") == idempotency_key
+            ]
+        raise ValueError(f"unknown resource kind {kind!r}")
+
     def launch_instance(
         self,
         site: str,
@@ -767,6 +807,12 @@ class ChameleonAdapter:
         existing = store.resource_by_idempotency_key(idempotency_key)
         if existing is not None:
             return self.get_instance(site, existing.provider_id)
+        made = made_earlier(self, site, "instance", run_id, idempotency_key)
+        if made is not None:
+            store.create_resource_with_event(
+                run_id, made, "instance", site, expires_at, idempotency_key=idempotency_key
+            )
+            return self.get_instance(site, made)
 
         with self._ctx(site, "launch_instance") as d:
             flavor_name = flavor
@@ -859,22 +905,26 @@ class ChameleonAdapter:
         existing = store.resource_by_idempotency_key(idempotency_key)
         if existing is not None:
             return name
+        made = made_earlier(self, site, "security_group", run_id, idempotency_key)
 
         with self._ctx(site, "ensure_security_group"):
             neutron = chi.network.neutron(self._session(site))
             try:
-                group = neutron.create_security_group(
+                group_id = made or neutron.create_security_group(
                     {
                         "security_group": {
                             "name": name,
                             "description": f"cloud-conversations run {run_id}",
                         }
                     }
-                )["security_group"]
+                )["security_group"]["id"]
+            except Exception as exc:
+                raise self._map_provider_error(exc, "security_group", name) from exc
+            try:
                 neutron.create_security_group_rule(
                     {
                         "security_group_rule": {
-                            "security_group_id": group["id"],
+                            "security_group_id": group_id,
                             "direction": "ingress",
                             "protocol": "tcp",
                             "port_range_min": 22,
@@ -884,11 +934,12 @@ class ChameleonAdapter:
                     }
                 )
             except Exception as exc:
-                raise self._map_provider_error(exc, "security_group", name) from exc
+                if self._status_of(exc) != 409:  # 409: the group already admits SSH
+                    raise self._map_provider_error(exc, "security_group", name) from exc
 
-        log.info("created security group site=%s name=%s id=%s", site, name, group["id"])
+        log.info("created security group site=%s name=%s id=%s", site, name, group_id)
         store.create_resource_with_event(
-            run_id, group["id"], "security_group", site, None,
+            run_id, group_id, "security_group", site, None,
             idempotency_key=idempotency_key,
         )
         return name
@@ -910,12 +961,23 @@ class ChameleonAdapter:
         existing = store.resource_by_idempotency_key(idempotency_key)
         if existing is not None:
             return existing.provider_id
+        made = made_earlier(self, site, "floating_ip", run_id, idempotency_key)
+        if made is not None:
+            store.create_resource_with_event(
+                run_id, made, "floating_ip", site, None, idempotency_key=idempotency_key
+            )
+            return made
 
         with self._ctx(site, "allocate_floating_ip") as d:
             pool = self._floating_ip_pool(d)
             try:
                 fip = chi.network.neutron(self._session(site)).create_floatingip(
-                    {"floatingip": {"floating_network_id": self._network_id(site, pool)}}
+                    {
+                        "floatingip": {
+                            "floating_network_id": self._network_id(site, pool),
+                            "description": idempotency_key,
+                        }
+                    }
                 )["floatingip"]
             except Exception as exc:
                 raise self._map_provider_error(exc, "floating_ip", pool) from exc

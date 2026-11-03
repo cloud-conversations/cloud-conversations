@@ -10,9 +10,10 @@ import pytest
 
 import cloud_conversations.db.store as store
 from cloud_conversations import releases
+from cloud_conversations.api.app import PAUSED
 from cloud_conversations.api.deps import config, session_hash
 from cloud_conversations.schema.runs import Connection, Plan, PlanStep, RunState
-from tests.conftest import ALICE, BOB, TEST_DB_URL
+from tests.conftest import ALICE, BOB, TEST_DB_URL, queued_jobs
 
 pytestmark = pytest.mark.usefixtures("logged_in")
 
@@ -21,7 +22,7 @@ def _thread(client) -> str:
     return client.post("/threads", headers=ALICE).json()["thread_id"]
 
 
-def test_a_new_chat_is_named_by_its_first_message(client, dispatched):
+def test_a_new_chat_is_named_by_its_first_message(client):
     thread_id = _thread(client)
     assert client.get(f"/threads/{thread_id}", headers=ALICE).json()["thread"][
         "title"
@@ -37,7 +38,7 @@ def test_a_new_chat_is_named_by_its_first_message(client, dispatched):
     assert body["thread"]["title"] == "how do I reserve a node with a GPU?"
 
 
-def test_a_long_first_message_is_cut_to_a_title(client, dispatched):
+def test_a_long_first_message_is_cut_to_a_title(client):
     thread_id = _thread(client)
     said = "I need an A100 for a day to fine-tune a model on the ImageNet data I hold"
 
@@ -48,7 +49,7 @@ def test_a_long_first_message_is_cut_to_a_title(client, dispatched):
     assert len(title) < len(said)
 
 
-def test_posting_a_message_queues_one_exchange(client, dispatched):
+def test_posting_a_message_queues_one_exchange(client):
     thread_id = _thread(client)
 
     posted = client.post(
@@ -58,12 +59,12 @@ def test_posting_a_message_queues_one_exchange(client, dispatched):
     assert posted.status_code == 202
     body = posted.json()
     assert body["message"]["kind"] == "user"
-    assert dispatched == [("exchange", body["job"]["job_id"])]
+    assert queued_jobs() == [("exchange", body["job"]["job_id"])]
     in_flight = client.get(f"/threads/{thread_id}", headers=ALICE).json()["jobs"]
     assert [j["kind"] for j in in_flight] == ["exchange"]
 
 
-def test_a_second_message_is_refused_while_the_first_is_unfinished(client, dispatched):
+def test_a_second_message_is_refused_while_the_first_is_unfinished(client):
     thread_id = _thread(client)
     client.post(f"/threads/{thread_id}/messages", json={"text": "one"}, headers=ALICE)
 
@@ -74,12 +75,12 @@ def test_a_second_message_is_refused_while_the_first_is_unfinished(client, dispa
     assert (again.status_code, again.json()) == (
         409, {"detail": f"Thread {thread_id} already has an unfinished exchange job"}
     )
-    assert len(dispatched) == 1
+    assert len(queued_jobs()) == 1
     messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
     assert [m["text"] for m in messages] == ["one"]
 
 
-def test_another_owners_chat_is_not_there(client, dispatched):
+def test_another_owners_chat_is_not_there(client):
     thread_id = _thread(client)
 
     assert client.get(f"/threads/{thread_id}", headers=BOB).status_code == 404
@@ -87,14 +88,14 @@ def test_another_owners_chat_is_not_there(client, dispatched):
     assert len(client.get("/threads", headers=ALICE).json()) == 1
 
 
-def test_a_caller_without_a_session_is_told_to_log_in(client, dispatched):
+def test_a_caller_without_a_session_is_told_to_log_in(client):
     refused = client.get("/threads", headers={"Cookie": "cc_session=made-up"})
 
     assert refused.status_code == 401
     assert refused.json() == {"detail": "log in first"}
 
 
-def test_a_change_sent_from_another_site_is_refused(client, dispatched):
+def test_a_change_sent_from_another_site_is_refused(client):
     refused = client.post(
         "/threads", headers={**ALICE, "Origin": "https://evil.example.org"}
     )
@@ -104,19 +105,19 @@ def test_a_change_sent_from_another_site_is_refused(client, dispatched):
     assert store.list_threads("chameleon:alice") == []
 
 
-def test_a_change_with_no_origin_is_refused(client, dispatched):
+def test_a_change_with_no_origin_is_refused(client):
     refused = client.post("/threads", headers={"Cookie": ALICE["Cookie"]})
 
     assert refused.status_code == 403
 
 
-def test_a_new_chat_builds_in_the_callers_first_project(client, dispatched):
+def test_a_new_chat_builds_in_the_callers_first_project(client):
     created = client.post("/threads", headers=ALICE).json()
 
     assert created["project_id"] == "CHI-000001"
 
 
-def test_a_chat_moves_only_to_a_project_the_caller_is_in(client, dispatched):
+def test_a_chat_moves_only_to_a_project_the_caller_is_in(client):
     thread_id = _thread(client)
 
     refused = client.patch(
@@ -128,14 +129,14 @@ def test_a_chat_moves_only_to_a_project_the_caller_is_in(client, dispatched):
     assert store.get_thread("chameleon:alice", uuid.UUID(thread_id)).project_id == "CHI-000001"
 
 
-def test_a_patch_that_names_nothing_is_refused(client, dispatched):
+def test_a_patch_that_names_nothing_is_refused(client):
     refused = client.patch(f"/threads/{_thread(client)}", json={}, headers=ALICE)
 
     assert refused.status_code == 422
     assert refused.json() == {"detail": "name a keypair or a project"}
 
 
-def test_an_expired_session_is_told_to_log_in(client, dispatched):
+def test_an_expired_session_is_told_to_log_in(client):
     store.record_login(
         "chameleon:carol",
         "carol",
@@ -231,7 +232,7 @@ def _description(owner: str, bm_requirements, bm_rubric) -> tuple[uuid.UUID, int
 
 
 def test_a_thread_carries_every_version_of_its_description(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     description_id, _ = _description(owner_a, bm_requirements, bm_rubric)
@@ -250,7 +251,7 @@ def test_a_thread_carries_every_version_of_its_description(
 
 
 def test_approving_a_version_queues_a_build_and_says_so_on_the_thread(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     store.update_thread(owner_a, uuid.UUID(thread_id), ssh_key_ref="cc-keypair")
@@ -263,15 +264,37 @@ def test_approving_a_version_queues_a_build_and_says_so_on_the_thread(
     )
 
     assert approved.status_code == 202
-    assert dispatched == [("build", approved.json()["job_id"])]
+    assert queued_jobs() == [("build", approved.json()["job_id"])]
     messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
     assert messages[-1]["kind"] == "run"
     assert messages[-1]["description_version"] == version
     assert "FAKE@BM" in messages[-1]["text"]
 
 
+def test_approving_a_version_while_builds_are_paused_is_refused_and_queues_nothing(
+    client, owner_a, bm_requirements, bm_rubric
+):
+    thread_id = _thread(client)
+    store.update_thread(owner_a, uuid.UUID(thread_id), ssh_key_ref="cc-keypair")
+    description_id, version = _description(owner_a, bm_requirements, bm_rubric)
+    store.set_paused(True)
+
+    refused = client.post(
+        f"/threads/{thread_id}/builds",
+        json={"description_id": str(description_id), "version": version},
+        headers=ALICE,
+    )
+
+    assert (refused.status_code, refused.json()) == (
+        409,
+        {"detail": "new builds are paused for maintenance. Approve the version again when it ends"},
+    )
+    assert queued_jobs() == []
+    assert store.unfinished_jobs(owner_a, uuid.UUID(thread_id)) == []
+
+
 def test_approving_a_version_is_the_request_its_build_runs_under(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     store.update_thread(owner_a, uuid.UUID(thread_id), ssh_key_ref="cc-keypair")
@@ -292,7 +315,7 @@ def test_approving_a_version_is_the_request_its_build_runs_under(
 
 
 def test_a_second_build_is_refused_while_one_is_live(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     store.update_thread(owner_a, uuid.UUID(thread_id), ssh_key_ref="cc-keypair")
@@ -305,11 +328,11 @@ def test_a_second_build_is_refused_while_one_is_live(
     assert (again.status_code, again.json()) == (
         409, {"detail": f"Thread {thread_id} already has an unfinished build job"}
     )
-    assert len(dispatched) == 1
+    assert len(queued_jobs()) == 1
 
 
 def test_approving_without_a_keypair_at_the_site_asks_for_one(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     description_id, version = _description(owner_a, bm_requirements, bm_rubric)
@@ -322,7 +345,7 @@ def test_approving_without_a_keypair_at_the_site_asks_for_one(
 
     assert refused.status_code == 409
     assert refused.json() == {"detail": "pick the keypair to log in to FAKE@BM with, then approve"}
-    assert dispatched == []
+    assert queued_jobs() == []
     messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
     (notice,) = [m for m in messages if m["kind"] == "notice"]
     assert (notice["payload"], notice["description_id"], notice["description_version"]) == (
@@ -330,59 +353,28 @@ def test_approving_without_a_keypair_at_the_site_asks_for_one(
     )
 
 
-def test_approving_a_lease_that_starts_too_late_to_finish_is_refused(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+def test_approving_a_lease_that_starts_days_from_now_queues_its_build(
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     store.update_thread(owner_a, uuid.UUID(thread_id), ssh_key_ref="cc-keypair")
-    settings = config().for_site("FAKE@BM", "physical_host")
-    budget_s = config().service.job_timeout_s - (
-        settings.lease_active_s + settings.instance_active_s + settings.ssh_s
-    )
-    start = (datetime.now(timezone.utc) + timedelta(seconds=budget_s + 600)).replace(
-        microsecond=0
-    )
+    start = datetime.now(timezone.utc) + timedelta(days=3)
     description_id, version = _description(
         owner_a, bm_requirements.model_copy(update={"start_at": start}), bm_rubric
     )
 
-    refused = client.post(
+    approved = client.post(
         f"/threads/{thread_id}/builds",
         json={"description_id": str(description_id), "version": version},
         headers=ALICE,
     )
 
-    assert refused.status_code == 422
-    assert refused.json() == {"detail": (
-        f"the lease starts {start:%Y-%m-%d %H:%M} UTC, too late for a build to finish; "
-        f"ask for a start within {budget_s / 3600:.1f} hours of now"
-    )}
-    assert dispatched == []
-
-def test_a_job_running_past_the_kill_limit_is_failed_on_the_next_request(client, owner_a):
-    from cloud_conversations.api.deps import STALE_JOB
-
-    thread_id = uuid.UUID(_thread(client))
-    job = store.enqueue_job(owner_a, thread_id, "exchange", {"text": "hello"})
-    store.start_job(job.job_id)
-    with store.transaction() as conn:
-        conn.execute(
-            "UPDATE chat.jobs SET started_at = now() - make_interval(secs => %s) "
-            "WHERE job_id = %s",
-            [config().service.job_kill_s + 1, job.job_id],
-        )
-
-    client.get("/me", headers=ALICE)
-
-    assert store.unfinished_jobs(owner_a, thread_id) == []
-    notices = [
-        (m.text, m.payload) for m in store.read_messages(owner_a, thread_id) if m.kind == "notice"
-    ]
-    assert notices == [(f"That did not work: {STALE_JOB}", {"job_id": str(job.job_id)})]
+    assert approved.status_code == 202
+    assert queued_jobs() == [("build", approved.json()["job_id"])]
 
 
 def test_approving_a_description_with_no_site_is_refused(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = _thread(client)
     description_id, version = store.create_description(
@@ -398,10 +390,10 @@ def test_approving_a_description_with_no_site_is_refused(
 
     assert approved.status_code == 422
     assert "names no site" in approved.json()["detail"]
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
-def test_approving_a_version_that_is_not_there_is_a_404(client, dispatched):
+def test_approving_a_version_that_is_not_there_is_a_404(client):
     thread_id = _thread(client)
 
     approved = client.post(
@@ -411,7 +403,7 @@ def test_approving_a_version_that_is_not_there_is_a_404(client, dispatched):
     )
 
     assert approved.status_code == 404
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 @pytest.fixture()
@@ -472,7 +464,7 @@ def _audit(owner: str) -> list[tuple[str, str, list[dict]]]:
 
 
 def test_releasing_resources_queues_a_teardown_and_records_the_confirmation(
-    client, dispatched, run, owner_a
+    client, run, owner_a
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
 
@@ -482,12 +474,12 @@ def test_releasing_resources_queues_a_teardown_and_records_the_confirmation(
 
     assert queued.status_code == 202
     assert queued.json()["kind"] == "teardown"
-    assert dispatched == [("teardown", queued.json()["job_id"])]
+    assert queued_jobs() == [("teardown", queued.json()["job_id"])]
     assert _audit(owner_a) == [("proposed", "user", [_LEASE]), ("confirmed", "user", [_LEASE])]
 
 
 def test_a_release_that_leaves_out_a_resource_the_run_holds_is_refused(
-    client, dispatched, run, owner_a
+    client, run, owner_a
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     store.record_resource(run, "instance-1", "instance", "FAKE@BM", None)
@@ -501,12 +493,12 @@ def test_a_release_that_leaves_out_a_resource_the_run_holds_is_refused(
         "the run holds lease lease-1 at FAKE@BM, instance instance-1 at FAKE@BM. "
         "Review the run and release it again"
     )
-    assert dispatched == []
+    assert queued_jobs() == []
     assert _audit(owner_a) == []
 
 
 def test_a_release_that_names_a_resource_the_run_does_not_hold_is_refused(
-    client, dispatched, run, owner_a
+    client, run, owner_a
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
 
@@ -516,11 +508,11 @@ def test_a_release_that_names_a_resource_the_run_does_not_hold_is_refused(
     )
 
     assert refused.status_code == 409
-    assert dispatched == []
+    assert queued_jobs() == []
     assert _audit(owner_a) == []
 
 
-def test_a_release_of_a_run_that_holds_nothing_is_refused(client, dispatched, run, owner_a):
+def test_a_release_of_a_run_that_holds_nothing_is_refused(client, run, owner_a):
     refused = client.post(
         f"/runs/{run}/teardown", json={"resources": [_LEASE]}, headers=ALICE
     )
@@ -540,7 +532,7 @@ def _offer(owner: str, run_id: uuid.UUID, version: int | None = None, **detail) 
     )
 
 
-def test_the_agents_proposal_is_put_to_the_user_in_the_chat(client, dispatched, run, owner_a):
+def test_the_agents_proposal_is_put_to_the_user_in_the_chat(client, run, owner_a):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
 
     request_id = _offer(owner_a, run)
@@ -555,35 +547,48 @@ def test_the_agents_proposal_is_put_to_the_user_in_the_chat(client, dispatched, 
     )
     assert asked["payload"]["request_id"] == str(request_id)
     assert body["decisions"] == {}
-    assert dispatched == [], "nothing is released before the user answers"
+    assert queued_jobs() == [], "nothing is released before the user answers"
 
 
-def test_confirming_the_agents_proposal_queues_its_release(client, dispatched, run, owner_a):
+def test_confirming_the_agents_proposal_queues_its_release(client, run, owner_a):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     request_id = _offer(owner_a, run)
 
     queued = client.post(f"/releases/{request_id}/confirm", headers=ALICE)
 
     assert queued.status_code == 202
-    assert dispatched == [("teardown", queued.json()["job_id"])]
+    assert queued_jobs() == [("teardown", queued.json()["job_id"])]
     assert _audit(owner_a) == [("proposed", "agent", [_LEASE]), ("confirmed", "user", [_LEASE])]
     thread_id = store.list_threads(owner_a)[0].thread_id
     decisions = client.get(f"/threads/{thread_id}", headers=ALICE).json()["decisions"]
     assert decisions == {str(request_id): "confirmed"}
 
 
-def test_declining_the_agents_proposal_keeps_the_run(client, dispatched, run, owner_a):
+def test_a_release_asked_for_while_paused_is_queued_and_the_user_told(client, run, owner_a):
+    store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
+    request_id = _offer(owner_a, run)
+    store.set_paused(True)
+
+    queued = client.post(f"/releases/{request_id}/confirm", headers=ALICE)
+
+    assert queued_jobs() == [("teardown", queued.json()["job_id"])]
+    thread_id = store.list_threads(owner_a)[0].thread_id
+    notices = [m.text for m in store.read_messages(owner_a, thread_id) if m.kind == "notice"]
+    assert notices[-1] == PAUSED
+
+
+def test_declining_the_agents_proposal_keeps_the_run(client, run, owner_a):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     request_id = _offer(owner_a, run)
 
     assert client.post(f"/releases/{request_id}/decline", headers=ALICE).status_code == 204
 
-    assert dispatched == []
+    assert queued_jobs() == []
     assert _audit(owner_a)[-1] == ("declined", "user", [_LEASE])
     assert [r.provider_id for r in store.live_resources(run)] == ["lease-1"]
 
 
-def test_an_answered_proposal_cannot_be_answered_again(client, dispatched, run, owner_a):
+def test_an_answered_proposal_cannot_be_answered_again(client, run, owner_a):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     request_id = _offer(owner_a, run)
     client.post(f"/releases/{request_id}/confirm", headers=ALICE)
@@ -595,7 +600,7 @@ def test_an_answered_proposal_cannot_be_answered_again(client, dispatched, run, 
 
 
 def test_a_proposal_is_refused_once_its_run_is_no_longer_failed(
-    client, dispatched, run, owner_a
+    client, run, owner_a
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     request_id = _offer(owner_a, run)
@@ -608,22 +613,22 @@ def test_a_proposal_is_refused_once_its_run_is_no_longer_failed(
         "the run has changed since the experiment agent asked. "
         "Review the run and release it from its card"
     )
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 def test_an_older_proposal_is_refused_once_the_agent_has_made_another(
-    client, dispatched, run, owner_a
+    client, run, owner_a
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     older = _offer(owner_a, run)
     _offer(owner_a, run)
 
     assert client.post(f"/releases/{older}/confirm", headers=ALICE).status_code == 409
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 def test_a_proposal_is_refused_once_the_run_holds_more_than_it_names(
-    client, dispatched, run, owner_a
+    client, run, owner_a
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     request_id = _offer(owner_a, run)
@@ -632,11 +637,11 @@ def test_a_proposal_is_refused_once_the_run_holds_more_than_it_names(
     refused = client.post(f"/releases/{request_id}/confirm", headers=ALICE)
 
     assert refused.status_code == 409
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 def test_confirming_a_revision_queues_a_build_that_replaces_the_run(
-    client, dispatched, run, owner_a, bm_requirements, bm_rubric
+    client, run, owner_a, bm_requirements, bm_rubric
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     thread_id = store.list_threads(owner_a)[0].thread_id
@@ -651,7 +656,7 @@ def test_confirming_a_revision_queues_a_build_that_replaces_the_run(
     queued = client.post(f"/releases/{request_id}/confirm", headers=ALICE)
 
     assert queued.status_code == 202
-    assert dispatched == [("build", queued.json()["job_id"])]
+    assert queued_jobs() == [("build", queued.json()["job_id"])]
     (job,) = store.unfinished_jobs(owner_a, thread_id)
     assert job.payload == {
         "description_id": str(description_id), "version": 2, "replaces_run_id": str(run),
@@ -660,8 +665,27 @@ def test_confirming_a_revision_queues_a_build_that_replaces_the_run(
     assert _audit(owner_a)[-1] == ("confirmed", "user", [_LEASE])
 
 
+def test_confirming_a_revision_while_paused_queues_its_build(
+    client, run, owner_a, bm_requirements, bm_rubric
+):
+    store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
+    thread_id = store.list_threads(owner_a)[0].thread_id
+    store.update_thread(owner_a, thread_id, ssh_key_ref="cc-keypair")
+    description_id = store.get_run(owner_a, run).description_id
+    store.create_description(
+        owner_a, "test", bm_requirements.model_copy(update={"site": "FAKE@BM"}), bm_rubric,
+        description_id=description_id, parent_version=1,
+    )
+    request_id = _offer(owner_a, run, action="revise", version=2, change="use Ubuntu 22.04")
+    store.set_paused(True)
+
+    queued = client.post(f"/releases/{request_id}/confirm", headers=ALICE)
+
+    assert queued_jobs() == [("build", queued.json()["job_id"])]
+
+
 def test_a_revision_of_a_run_already_released_counts_against_the_limit(
-    client, dispatched, run, owner_a, bm_requirements, bm_rubric
+    client, run, owner_a, bm_requirements, bm_rubric
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     thread_id = store.list_threads(owner_a)[0].thread_id
@@ -683,11 +707,11 @@ def test_a_revision_of_a_run_already_released_counts_against_the_limit(
     assert refused.json()["detail"] == (
         "you have 1 active experiments, the most allowed; release one from your profile"
     )
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 def test_declining_a_revision_offers_its_version_for_approval(
-    client, dispatched, run, owner_a, bm_requirements, bm_rubric
+    client, run, owner_a, bm_requirements, bm_rubric
 ):
     store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
     description_id = store.get_run(owner_a, run).description_id
@@ -702,10 +726,10 @@ def test_declining_a_revision_offers_its_version_for_approval(
     thread_id = store.list_threads(owner_a)[0].thread_id
     last = store.read_messages(owner_a, thread_id)[-1]
     assert (last.kind, last.description_version) == ("description", 2)
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
-def test_the_thread_lists_the_runs_of_its_description(client, dispatched, run, owner_a):
+def test_the_thread_lists_the_runs_of_its_description(client, run, owner_a):
     thread_id = store.list_threads(owner_a)[0].thread_id
 
     runs = client.get(f"/threads/{thread_id}", headers=ALICE).json()["runs"]
@@ -715,7 +739,7 @@ def test_the_thread_lists_the_runs_of_its_description(client, dispatched, run, o
 
 
 def test_a_thread_carries_every_experiment_it_has_worked_on(
-    client, dispatched, run, owner_a, bm_requirements, bm_rubric
+    client, run, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = store.list_threads(owner_a)[0].thread_id
     second, version = _description(owner_a, bm_requirements, bm_rubric)
@@ -735,7 +759,7 @@ def test_a_thread_carries_every_experiment_it_has_worked_on(
 
 
 def test_a_run_of_an_earlier_experiment_can_still_be_released(
-    client, dispatched, run, owner_a, bm_requirements, bm_rubric
+    client, run, owner_a, bm_requirements, bm_rubric
 ):
     thread_id = store.list_threads(owner_a)[0].thread_id
     second, _ = _description(owner_a, bm_requirements, bm_rubric)
@@ -750,7 +774,7 @@ def test_a_run_of_an_earlier_experiment_can_still_be_released(
     assert queued.json()["run_id"] == str(run)
 
 
-def test_a_thread_carries_what_one_approval_permits(client, dispatched):
+def test_a_thread_carries_what_one_approval_permits(client):
     thread_id = _thread(client)
 
     limits = client.get(f"/threads/{thread_id}", headers=ALICE).json()["limits"]
@@ -766,10 +790,10 @@ def test_healthz_says_nothing_about_the_caller(client):
     assert client.get("/healthz").json() == {"status": "ok"}
 
 
-def test_a_deleted_chat_moves_from_the_sidebar_to_the_trash(client, dispatched):
+def test_a_deleted_chat_moves_from_the_sidebar_to_the_trash(client):
     thread_id = _thread(client)
     client.post(f"/threads/{thread_id}/messages", json={"text": "hello"}, headers=ALICE)
-    store.finish_job(uuid.UUID(dispatched[0][1]))
+    store.finish_job(uuid.UUID(queued_jobs()[0][1]))
 
     assert client.delete(f"/threads/{thread_id}", headers=ALICE).status_code == 204
 
@@ -857,7 +881,7 @@ def test_restoring_a_chat_brings_back_what_its_deletion_stamped_and_nothing_else
 
 
 def test_a_description_in_the_trash_cannot_be_built_from_another_chat(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     trashed, description_id, _ = _chat_with_a_run(owner_a, bm_requirements, bm_rubric)
     client.delete(f"/threads/{trashed}", headers=ALICE)
@@ -869,7 +893,7 @@ def test_a_description_in_the_trash_cannot_be_built_from_another_chat(
     )
 
     assert refused.status_code == 404
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 def test_a_chat_out_of_the_trash_cannot_be_restored(client, owner_a, bm_requirements, bm_rubric):
@@ -887,7 +911,7 @@ def test_a_chat_out_of_the_trash_cannot_be_restored(client, owner_a, bm_requirem
     assert _deleted_at("chat.threads", "thread_id", thread_id) != [None]
 
 
-def test_a_chat_with_work_in_flight_is_not_deleted(client, dispatched):
+def test_a_chat_with_work_in_flight_is_not_deleted(client):
     thread_id = _thread(client)
     client.post(f"/threads/{thread_id}/messages", json={"text": "hello"}, headers=ALICE)
 
@@ -942,10 +966,15 @@ def test_a_queued_build_and_release_wait_while_someone_elses_build_runs(
         return {j["kind"]: j["waiting"] for j in jobs}
 
     assert waiting() == {"build": False, "teardown": False, "exchange": False}
-    store.start_job(bobs.job_id)
+    _running(bobs.job_id)
     assert waiting() == {"build": True, "teardown": True, "exchange": False}
-    store.start_job(alices_build.job_id)
+    _running(alices_build.job_id)
     assert waiting() == {"build": False, "teardown": True, "exchange": False}
+
+
+def _running(job_id: uuid.UUID) -> None:
+    with store.transaction() as conn:
+        conn.execute("UPDATE chat.jobs SET state = 'running' WHERE job_id = %s", [job_id])
 
 
 def test_an_admin_rotation_retires_the_key_new_instances_got(client, alice_is_an_admin):

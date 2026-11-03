@@ -23,7 +23,7 @@ from cloud_conversations.schema.runs import (
     RunState,
 )
 from cloud_conversations.steps import ACTIONS
-from cloud_conversations.steps.context import StepContext, StepError
+from cloud_conversations.steps.context import NotYet, StepContext, StepError
 from cloud_conversations.steps.failure import FailureKind, RetryScope
 from cloud_conversations.steps.failure import record as record_failure
 from cloud_conversations.steps.retry import record as record_retry
@@ -380,6 +380,8 @@ def _run_steps(
                 ),
             )
             return None
+        except NotYet:
+            raise
         except Exception as exc:  # noqa: BLE001
             _step_failed(
                 owner_id, run_id, plan_step.step_id, plan_step.action, "step",
@@ -478,6 +480,27 @@ def provision(
     settings: Settings,
 ) -> uuid.UUID:
     """Run a description version to completion. Return run_id."""
+    run_id = plan_run(
+        owner_id, description_id, version, project_id, keypair, adapter, site, settings
+    )
+    execute(run_id, adapter, settings)
+    return run_id
+
+
+def plan_run(
+    owner_id: str,
+    description_id: uuid.UUID,
+    version: int,
+    project_id: str | None,
+    keypair: str,
+    adapter: TestbedAdapter,
+    site: str,
+    settings: Settings,
+) -> uuid.UUID:
+    """Create a run of a description version and plan it. Return run_id.
+
+    A run that cannot be planned fails.
+    """
     desc = store.get_description(owner_id, description_id, version)
     rubric_kinds = frozenset(c.kind for c in desc.rubric)
 
@@ -510,16 +533,24 @@ def provision(
         {"plan_id": plan.plan_id, "plan": plan.model_dump()},
         owner_id=owner_id,
     )
+    return run_id
 
+
+def execute(run_id: uuid.UUID, adapter: TestbedAdapter, settings: Settings) -> None:
+    """Carry out a newly planned run."""
+    run = store.get_run_unscoped(run_id)
+    if run.plan is None or run.state != RunState.planning:
+        return
+    desc = store.get_description(run.owner_id, run.description_id, run.description_version)
     with audit.on_run(run_id):
         reached = _execute_plan(
-            run_id, owner_id, adapter, plan, desc.requirements, settings, RunState.planning
+            run_id, run.owner_id, adapter, run.plan, desc.requirements, settings,
+            RunState.planning,
         )
         if reached is not None:
             _validate_and_settle(
-                run_id, owner_id, adapter, plan, desc.rubric, settings, reached
+                run_id, run.owner_id, adapter, run.plan, desc.rubric, settings, reached
             )
-    return run_id
 
 
 def resume(run_id: uuid.UUID, adapter: TestbedAdapter, settings: Settings) -> None:
@@ -570,6 +601,20 @@ def resume(run_id: uuid.UUID, adapter: TestbedAdapter, settings: Settings) -> No
             _validate_and_settle(
                 run_id, run.owner_id, adapter, run.plan, desc.rubric, settings, reached
             )
+
+
+def stop(run_id: uuid.UUID, reason: str) -> None:
+    """Mark an unfinished run failed."""
+    run = store.get_run_unscoped(run_id)
+    _fail(run.owner_id, run_id, Failure(kind="step", message=reason))
+
+
+def lease_ended(run_id: uuid.UUID, lease_id: str, site: str) -> None:
+    """Mark a run's lease and its instances released."""
+    store.release_resource_with_event(run_id, "lease", lease_id, site)
+    for r in store.live_resources(run_id):
+        if r.kind == "instance":
+            store.release_resource_with_event(run_id, "instance", r.provider_id, r.site)
 
 
 def teardown(run_id: uuid.UUID, adapter: TestbedAdapter) -> list[ReleaseOutcome]:

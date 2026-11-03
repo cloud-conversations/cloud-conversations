@@ -6,21 +6,19 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
-DEFAULT_BROKER_URL = "redis://localhost:6379/0"
-
-BROKER_URL_ENV = "CC_BROKER_URL"
-
 # What a thread is called until its first message names it.
 NEW_THREAD_TITLE = "New experiment"
 
 # Per-user limits. Each is a Service field and an auth.users column.
 QUOTAS = ("max_messages_per_day", "max_builds_per_user", "max_active_experiments_per_user")
 
-# The queues tasks are routed to.
-CHAT_QUEUE = "chat"
-RUNS_QUEUE = "runs"
+# Job kinds that change the testbed.
+TESTBED_KINDS = ("build", "teardown")
 
-# Seconds a job gets after its soft time limit before it is killed.
+# Job kinds for each worker queue.
+QUEUES = {"chat": ("exchange",), "runs": TESTBED_KINDS}
+
+# Extra seconds a job gets after job_timeout_s.
 JOB_KILL_GRACE_S = 60
 
 
@@ -33,9 +31,24 @@ class Service(BaseModel):
     bundle_dir: str = "bundle"
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
-    broker_url: str = DEFAULT_BROKER_URL
     # A job is stopped at this many seconds.
     job_timeout_s: float = Field(default=5400.0, gt=0)
+    # Seconds a claim on a job lasts without renewal.
+    job_claim_s: float = Field(default=60.0, gt=0)
+    # Seconds an idle worker waits before looking for a job again.
+    job_poll_s: float = Field(default=1.0, gt=0)
+    # Times a job may start before it fails.
+    job_attempts: int = Field(default=3, ge=1)
+    # Seconds late a build may still start, if nothing is reserved for it.
+    build_grace_s: float = Field(default=3600.0, ge=0)
+    # Seconds of warning a chat gets before its lease ends.
+    lease_warning_s: float = Field(default=3600.0, ge=0)
+    # Seconds between an idle worker's lease checks.
+    lease_watch_s: float = Field(default=300.0, gt=0)
+    # Seconds to keep trying to reach the database.
+    db_connect_s: float = Field(default=30.0, ge=0)
+    # Seconds between tries.
+    db_retry_s: float = Field(default=1.0, gt=0)
     # Thread messages the router sees.
     route_history: int = Field(default=6, ge=0)
     thread_title_chars: int = Field(default=60, ge=1)

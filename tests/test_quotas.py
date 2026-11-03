@@ -10,7 +10,7 @@ import pytest
 
 import cloud_conversations.db.store as store
 from cloud_conversations.api.deps import config
-from tests.conftest import ALICE, TEST_DB_URL
+from tests.conftest import ALICE, TEST_DB_URL, queued_jobs
 
 pytestmark = pytest.mark.usefixtures("logged_in")
 
@@ -49,7 +49,7 @@ def _approve(client, owner: str, requirements, rubric):
 
 
 def test_a_message_past_the_daily_limit_is_refused_until_the_oldest_ages_out(
-    client, dispatched, owner_a
+    client, owner_a
 ):
     _limit(owner_a, max_messages_per_day=2)
     for _ in range(2):
@@ -73,11 +73,11 @@ def test_a_message_past_the_daily_limit_is_refused_until_the_oldest_ages_out(
         "detail": "you have sent 2 messages in the last 24 hours; "
                   f"send another after {after:%Y-%m-%d %H:%M} UTC"
     }
-    assert len(dispatched) == 2
+    assert len(queued_jobs()) == 2
 
 
 def test_a_build_past_the_builds_limit_is_refused(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     _limit(owner_a, max_builds_per_user=2)
     _build_job(owner_a)
@@ -89,7 +89,7 @@ def test_a_build_past_the_builds_limit_is_refused(
     assert refused.json() == {
         "detail": "you have 2 builds running, the most allowed; wait for one to finish"
     }
-    assert dispatched == []
+    assert len(queued_jobs()) == 2
 
 
 def test_runs_holding_hardware_and_unfinished_builds_are_active_experiments(
@@ -109,7 +109,7 @@ def test_runs_holding_hardware_and_unfinished_builds_are_active_experiments(
 
 
 def test_a_build_past_the_active_experiments_limit_is_refused(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     _limit(owner_a, max_active_experiments_per_user=1)
     _run_holding_hardware(owner_a, bm_requirements, bm_rubric, "passed")
@@ -120,11 +120,11 @@ def test_a_build_past_the_active_experiments_limit_is_refused(
     assert refused.json() == {
         "detail": "you have 1 active experiments, the most allowed; release one from your profile"
     }
-    assert dispatched == []
+    assert queued_jobs() == []
 
 
 def test_the_profile_shows_each_limit_and_the_experiments_holding_hardware(
-    client, dispatched, owner_a, bm_requirements, bm_rubric
+    client, owner_a, bm_requirements, bm_rubric
 ):
     _limit(owner_a, max_builds_per_user=5)
     run_id = _run_holding_hardware(owner_a, bm_requirements, bm_rubric, "passed")
@@ -156,14 +156,14 @@ def _send(client) -> int:
     return sent.status_code
 
 
-def test_a_limit_for_everyone_holds_a_user_with_no_override(client, dispatched):
+def test_a_limit_for_everyone_holds_a_user_with_no_override(client):
     store.set_everyone_limits(max_messages_per_day=1)
 
     assert (_send(client), _send(client)) == (202, 429)
 
 
 def test_a_user_with_their_own_limit_gets_it_not_the_limit_for_everyone(
-    client, dispatched, owner_a
+    client, owner_a
 ):
     store.set_everyone_limits(max_messages_per_day=1)
     _limit(owner_a, max_messages_per_day=2)

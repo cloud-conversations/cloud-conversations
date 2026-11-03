@@ -25,7 +25,6 @@ dev = [
 service = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
-    "celery[redis]>=5.4",
 ]
 # Needed to build or search the knowledge base.
 knowledge = [

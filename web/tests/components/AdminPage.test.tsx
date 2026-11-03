@@ -59,6 +59,18 @@ const FEEDBACK = {
   run_failure: null,
 };
 
+const JOB = {
+  job_id: "j1111111-1111-1111-1111-111111111111",
+  kind: "teardown",
+  state: "running",
+  username: "bob",
+  title: "a vm",
+  site: "KVM@TACC",
+  run_state: "passed",
+  created_at: "2026-10-01T10:00:00Z",
+  started_at: "2026-10-01T10:00:00Z",
+};
+
 const ANSWERS: Record<string, unknown> = {
   "/api/admin/feedback?page=1": { feedback: [FEEDBACK], more: true, size: 5, sizes: [5, 25] },
   "/api/admin/feedback?page=2": { feedback: [], more: false, size: 5, sizes: [5, 25] },
@@ -72,13 +84,15 @@ const ANSWERS: Record<string, unknown> = {
   "/api/admin/users?page=2": { users: [], more: false, size: 25, sizes: [25, 100] },
   "/api/admin/settings": {
     require_approval: true,
+    paused: false,
     limits: [{ name: "max_builds_per_user", default: 2, override: 5 }],
   },
+  "/api/admin/jobs": [JOB],
   "/api/admin/system-keys": [KEY],
   "/api/announcement": null,
 };
 
-function show() {
+function show(answers: Record<string, unknown> = ANSWERS) {
   const calls: [string, string, string | undefined][] = [];
   vi.stubGlobal(
     "fetch",
@@ -87,7 +101,7 @@ function show() {
       return {
         ok: true,
         status: 200,
-        json: async () => (init?.method === "POST" ? KEY : init?.method ? {} : ANSWERS[path]),
+        json: async () => (init?.method === "POST" ? KEY : init?.method ? {} : answers[path]),
       };
     }),
   );
@@ -138,6 +152,51 @@ describe("the admin page", () => {
         JSON.stringify({ text: "maintenance at noon" }),
       ]),
     );
+  });
+
+  it("pauses builds and releases", async () => {
+    const calls = show();
+
+    const box = await screen.findByLabelText("Pause builds and releases");
+    await waitFor(() => expect(box).toBeEnabled());
+    await userEvent.click(box);
+
+    await waitFor(() =>
+      expect(calls).toContainEqual([
+        "PATCH",
+        "/api/admin/settings",
+        JSON.stringify({ paused: true }),
+      ]),
+    );
+  });
+
+  it("lists each build and release in progress", async () => {
+    show();
+
+    const row = (await screen.findByText("Release")).closest("tr") as HTMLElement;
+    const cells = [...row.querySelectorAll("td")].map((cell) => cell.textContent);
+    expect([cells[0], cells[1], cells[2], cells[3], cells[5]]).toEqual([
+      "Release",
+      "bob",
+      "a vm",
+      "KVM@TACC",
+      "passed",
+    ]);
+  });
+
+  it("says it is safe to deploy when only queued jobs are left", async () => {
+    show({ ...ANSWERS, "/api/admin/jobs": [{ ...JOB, state: "queued", started_at: null }] });
+
+    expect(
+      await screen.findByText("Nothing is running. It is safe to deploy."),
+    ).toBeInTheDocument();
+  });
+
+  it("does not say it is safe to deploy while a job is running", async () => {
+    show();
+
+    await screen.findByText("Release");
+    expect(screen.queryByText("Nothing is running. It is safe to deploy.")).not.toBeInTheDocument();
   });
 
   it("lists each user's status, logins and chat count, linked to their panel", async () => {

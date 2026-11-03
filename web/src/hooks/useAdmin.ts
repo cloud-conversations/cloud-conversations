@@ -6,11 +6,14 @@ import {
   fetchAnnouncement,
   fetchFeedback,
   fetchFeedbackDetail,
+  fetchJobsInProgress,
   fetchUser,
   patchUser,
   postAnnouncement,
   patchAdminSettings,
 } from "../api/client";
+
+const JOBS_POLL_MS = 5000;
 
 export function useUser(userId: string) {
   return useQuery({ queryKey: ["user", userId], queryFn: () => fetchUser(userId) });
@@ -70,4 +73,12 @@ export function useAdminSettings() {
 
 export function useSetAdminSettings() {
   return useAdminChange(patchAdminSettings);
+}
+
+export function useJobsInProgress() {
+  return useQuery({
+    queryKey: ["jobs-in-progress"],
+    queryFn: fetchJobsInProgress,
+    refetchInterval: JOBS_POLL_MS,
+  });
 }

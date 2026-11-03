@@ -294,3 +294,9 @@ class TestbedAdapter(Protocol):
     def reserved_host(self, site: str, reservation_id: str) -> str | None:
         """Name the host behind a reservation."""
         ...
+
+    def find_planned(
+        self, site: str, kind: str, run_id: uuid.UUID, idempotency_key: str
+    ) -> str | None:
+        """Find a planned resource the run has not recorded yet."""
+        ...

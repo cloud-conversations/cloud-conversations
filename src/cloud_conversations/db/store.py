@@ -192,6 +192,9 @@ class Job:
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime
+    # The token of the worker that claimed the job.
+    claim: uuid.UUID | None
+    attempts: int
 
 
 @dataclass
@@ -317,6 +320,38 @@ class ActiveExperiment:
     thread_id: uuid.UUID | None
     title: str | None
     resources: list[dict[str, str]]
+
+
+@dataclass
+class JobInProgress:
+    job_id: uuid.UUID
+    kind: str
+    state: str
+    username: str
+    title: str
+    site: str | None
+    run_state: str | None
+    created_at: datetime
+    started_at: datetime | None
+
+
+@dataclass
+class LeaseDue:
+    run_id: uuid.UUID
+    lease_id: str
+    site: str
+    expires_at: datetime
+    owner_id: str
+    project_id: str | None
+    description_id: uuid.UUID
+
+
+@dataclass
+class PlannedResource:
+    idempotency_key: str
+    run_id: uuid.UUID
+    kind: str
+    site: str
 
 
 @dataclass
@@ -793,6 +828,20 @@ def touch_heartbeat(run_id: uuid.UUID) -> None:
         )
 
 
+def newest_run_since(owner_id: str, description_id: uuid.UUID, since: datetime) -> Run | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM experiments.runs
+             WHERE owner_id = %s AND description_id = %s AND created_at >= %s
+               AND deleted_at IS NULL
+             ORDER BY created_at DESC LIMIT 1
+            """,
+            [owner_id, description_id, since],
+        ).fetchone()
+    return _row_to_run(row) if row is not None else None  # type: ignore[arg-type]
+
+
 def runs_for_description(owner_id: str, description_id: uuid.UUID) -> list[Run]:
     with get_conn() as conn:
         rows = conn.execute(
@@ -962,6 +1011,10 @@ def create_resource_with_event(
         if outcome == "inserted":
             append_event(run_id, "adapter", "resource_created",
                          {"kind": kind, "provider_id": provider_id, "site": site}, conn=c)
+        c.execute(
+            "DELETE FROM experiments.planned_resources WHERE idempotency_key = %s",
+            [idempotency_key],
+        )
 
     if outcome == "duplicate_key":
         raise DuplicateKeyError(
@@ -969,6 +1022,46 @@ def create_resource_with_event(
             f"resource; recorded {kind} {provider_id!r} untagged"
         )
     return outcome
+
+
+def plan_resource(run_id: uuid.UUID, kind: str, site: str, idempotency_key: str) -> bool:
+    """Note a resource about to be created at the provider.
+
+    Returns False if an earlier attempt noted it.
+    """
+    with _translate(), transaction() as c:
+        _lock_run(c, run_id)
+        row = c.execute(
+            """
+            INSERT INTO experiments.planned_resources (idempotency_key, run_id, kind, site)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
+            RETURNING idempotency_key
+            """,
+            [idempotency_key, run_id, kind, site],
+        ).fetchone()
+    return row is not None
+
+
+def planned_resources(run_id: uuid.UUID) -> list[PlannedResource]:
+    """A caller serving a user must authorise the run first."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT idempotency_key, run_id, kind, site FROM experiments.planned_resources "
+            "WHERE run_id = %s ORDER BY created_at",
+            [run_id],
+        ).fetchall()
+    return [PlannedResource(**r) for r in rows]
+
+
+def recorded_provider_ids(run_id: uuid.UUID, kind: str) -> set[str]:
+    """The run's recorded ids of this kind, released ones included."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT provider_id FROM experiments.run_resources WHERE run_id = %s AND kind = %s",
+            [run_id, kind],
+        ).fetchall()
+    return {r["provider_id"] for r in rows}
 
 
 def resource_by_idempotency_key(key: str) -> Resource | None:
@@ -1130,6 +1223,58 @@ def parents_of(parent_ids: list[uuid.UUID]) -> dict[uuid.UUID, Passage]:
         ).fetchall()
     found = [Passage.model_validate(dict(r)) for r in rows]
     return {p.parent_id: p for p in found}
+
+
+_LEASE_DUE = """
+    RETURNING res.run_id, res.provider_id AS lease_id, res.site, res.expires_at,
+              r.owner_id, r.project_id, r.description_id
+"""
+
+
+def leases_to_warn(within_s: float) -> list[LeaseDue]:
+    """Claim each lease that ends within within_s and has had no warning. Not owner-scoped."""
+    with _translate(), transaction() as c:
+        rows = c.execute(
+            """
+            UPDATE experiments.run_resources res SET warned_at = now()
+              FROM experiments.runs r
+             WHERE res.run_id = r.run_id AND res.kind = 'lease' AND res.released_at IS NULL
+               AND res.warned_at IS NULL AND res.expires_at > now()
+               AND res.expires_at <= now() + make_interval(secs => %s)
+            """ + _LEASE_DUE,
+            [within_s],
+        ).fetchall()
+    return [LeaseDue(**r) for r in rows]
+
+
+def ended_leases_to_check(every_s: float) -> list[LeaseDue]:
+    """Claim each lease past its end that was not checked in the last every_s.
+
+    Not owner-scoped.
+    """
+    with _translate(), transaction() as c:
+        rows = c.execute(
+            """
+            UPDATE experiments.run_resources res SET checked_at = now()
+              FROM experiments.runs r
+             WHERE res.run_id = r.run_id AND res.kind = 'lease' AND res.released_at IS NULL
+               AND res.expires_at <= now()
+               AND (res.checked_at IS NULL
+                    OR res.checked_at < now() - make_interval(secs => %s))
+            """ + _LEASE_DUE,
+            [every_s],
+        ).fetchall()
+    return [LeaseDue(**r) for r in rows]
+
+
+def record_lease_end(run_id: uuid.UUID, lease_id: str, ends_at: datetime) -> None:
+    """Record a lease's new end. Not owner-scoped."""
+    with _translate(), transaction() as c:
+        c.execute(
+            "UPDATE experiments.run_resources SET expires_at = %s, warned_at = NULL "
+            "WHERE run_id = %s AND kind = 'lease' AND provider_id = %s",
+            [ends_at, run_id, lease_id],
+        )
 
 
 def live_resources(run_id: uuid.UUID) -> list[Resource]:
@@ -1350,6 +1495,8 @@ def _row_to_job(row: dict) -> Job:
         started_at=row["started_at"],
         finished_at=row["finished_at"],
         created_at=row["created_at"],
+        claim=row["claim"],
+        attempts=row["attempts"],
     )
 
 
@@ -1783,30 +1930,94 @@ def any_build_running() -> bool:
         ).fetchone() is not None
 
 
-def start_job(job_id: uuid.UUID) -> Job | None:
-    """Mark a queued job running. Not owner-scoped.
+def builds_and_releases_in_progress() -> list[JobInProgress]:
+    """Not owner-scoped."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT j.job_id, j.kind, j.state, u.username, t.title, j.created_at, j.started_at,
+                   coalesce(r.plan->>'site', d.requirements->>'site') AS site,
+                   r.state AS run_state
+              FROM chat.jobs j
+              JOIN auth.users u ON u.user_id = j.owner_id
+              JOIN chat.threads t ON t.thread_id = j.thread_id
+              LEFT JOIN experiments.experiment_descriptions d
+                ON d.description_id = (j.payload->>'description_id')::uuid
+               AND d.version = (j.payload->>'version')::int
+              LEFT JOIN LATERAL (
+                SELECT r.state, r.plan FROM experiments.runs r
+                 WHERE r.run_id = (j.payload->>'run_id')::uuid
+                    OR (r.description_id = d.description_id AND r.created_at >= j.started_at)
+                 ORDER BY r.created_at DESC LIMIT 1
+              ) r ON true
+             WHERE j.kind IN ('build', 'teardown') AND j.state = ANY(%s::text[])
+             ORDER BY j.created_at
+            """,
+            [_UNFINISHED_JOB_STATES],
+        ).fetchall()
+    return [JobInProgress(**r) for r in rows]
 
-    Returns None if the job is no longer queued.
+
+def claim_job(kinds: list[str], claim_s: float) -> Job | None:
+    """Claim the oldest waiting job of these kinds. Not owner-scoped.
+
+    Returns None if there is none.
     """
     with _translate(), get_conn() as conn, conn.transaction():
         row = conn.execute(
-            "UPDATE chat.jobs SET state = 'running', started_at = now() "
-            "WHERE job_id = %s AND state = 'queued' RETURNING *",
-            [job_id],
+            """
+            UPDATE chat.jobs
+               SET state = 'running', started_at = coalesce(started_at, now()),
+                   claim = gen_random_uuid(),
+                   claimed_until = now() + make_interval(secs => %s),
+                   attempts = attempts + 1
+             WHERE job_id = (
+                   SELECT job_id FROM chat.jobs
+                    WHERE kind = ANY(%s::text[])
+                      AND ((state = 'queued' AND run_after <= now())
+                           OR (state = 'running' AND claimed_until < now()))
+                    ORDER BY created_at
+                    LIMIT 1
+                      FOR UPDATE SKIP LOCKED)
+            RETURNING *
+            """,
+            [claim_s, kinds],
         ).fetchone()
     return _row_to_job(row) if row is not None else None
 
 
-def expire_stale_jobs(owner_id: str, older_than_s: float, error: str) -> list[Job]:
-    """Fail the owner's jobs that have been running longer than older_than_s."""
+def defer_job(job_id: uuid.UUID, until: datetime) -> Job:
+    """Put a running job back in the queue until a later time. Not owner-scoped."""
+    return _set_job(
+        job_id,
+        "UPDATE chat.jobs SET state = 'queued', claim = NULL, claimed_until = NULL, "
+        "attempts = 0, run_after = %s WHERE job_id = %s RETURNING *",
+        [until, job_id],
+    )
+
+
+def give_up_claim(job_id: uuid.UUID, claim: uuid.UUID) -> None:
+    """Let another worker take the job now. Not owner-scoped."""
     with _translate(), get_conn() as conn, conn.transaction():
-        rows = conn.execute(
-            "UPDATE chat.jobs SET state = 'error', error = %s, finished_at = now() "
-            "WHERE owner_id = %s AND state = 'running' "
-            "AND started_at < now() - make_interval(secs => %s) RETURNING *",
-            [error, owner_id, older_than_s],
-        ).fetchall()
-    return [_row_to_job(r) for r in rows]
+        conn.execute(
+            "UPDATE chat.jobs SET claimed_until = now(), attempts = attempts - 1 "
+            "WHERE job_id = %s AND claim = %s AND state = 'running'",
+            [job_id, claim],
+        )
+
+
+def renew_claim(job_id: uuid.UUID, claim: uuid.UUID, claim_s: float) -> bool:
+    """Extend a worker's claim on a job. Not owner-scoped.
+
+    Returns False if another worker has claimed the job since.
+    """
+    with _translate(), get_conn() as conn, conn.transaction():
+        row = conn.execute(
+            "UPDATE chat.jobs SET claimed_until = now() + make_interval(secs => %s) "
+            "WHERE job_id = %s AND claim = %s RETURNING job_id",
+            [claim_s, job_id, claim],
+        ).fetchone()
+    return row is not None
 
 
 def route_job(job_id: uuid.UUID, route: str) -> Job:
@@ -2356,6 +2567,17 @@ def require_approval() -> bool:
 def set_require_approval(required: bool) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE auth.settings SET require_approval = %s", [required])
+
+
+def paused() -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT paused FROM auth.settings").fetchone()
+    return row is not None and bool(row["paused"])
+
+
+def set_paused(paused: bool) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE auth.settings SET paused = %s", [paused])
 
 
 def everyone_limits() -> dict[str, int | None]:

@@ -10,6 +10,7 @@ import psycopg
 
 import cloud_conversations.db.store as store
 from cloud_conversations import audit
+from cloud_conversations.adapter.planned import record_planned
 from cloud_conversations.adapter.protocol import TestbedAdapter
 from cloud_conversations.db.store import (
     ConflictError,
@@ -168,6 +169,7 @@ def carry_out(
         raise ConflictError(f"release {request_id} is not confirmed")
     if proposal.run_id is None:
         raise ValueError(f"release {request_id} names no run")
+    record_planned(proposal.run_id, adapter)
     _covers(proposal)
     with audit.acting(owner_id, request_id):
         return sequential.teardown(proposal.run_id, adapter)

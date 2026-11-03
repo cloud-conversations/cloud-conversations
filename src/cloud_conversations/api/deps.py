@@ -23,8 +23,6 @@ SESSION_COOKIE = "cc_session"
 
 PUBLIC_URL_ENV = "CC_PUBLIC_URL"
 
-STALE_JOB = "the worker stopped before this job finished. Try it again."
-
 
 def no_project(label: str) -> str:
     return f"your {label} account belongs to no project; join one, then log in again"
@@ -82,11 +80,6 @@ def user(request: Request) -> store.User:
             detail=f"logging in through {config().label(found.testbed)} is turned off",
         )
     service = config().service
-    for job in store.expire_stale_jobs(found.user_id, service.job_kill_s, STALE_JOB):
-        store.append_message(
-            job.thread_id, "assistant", "notice", f"That did not work: {STALE_JOB}",
-            {"job_id": str(job.job_id)}, owner_id=found.user_id,
-        )
     if (
         found.checked_at is not None
         and datetime.now(timezone.utc) - found.checked_at > timedelta(seconds=service.login_check_s)

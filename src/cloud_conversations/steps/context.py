@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from cloud_conversations.config import Settings
@@ -44,6 +45,15 @@ class StepError(Exception):
         # Set to retry on a new reservation or address.
         self.retry_reservation = retry_reservation
         self.retry_address = retry_address
+
+
+class NotYet(Exception):
+    """Raised by a step that must wait until a later time."""
+
+    def __init__(self, until: datetime, notice: str) -> None:
+        super().__init__(notice)
+        self.until = until
+        self.notice = notice
 
 
 # When the job carrying the steps must stop, in time.monotonic() seconds.

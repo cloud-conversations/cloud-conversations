@@ -21,7 +21,7 @@ from cloud_conversations.environment.items import SETUP_KEYS
 from cloud_conversations.schema.description import reservation_kind_of
 from cloud_conversations.schema.runs import Connection
 from cloud_conversations.steps import retry
-from cloud_conversations.steps.context import StepContext, StepError, finish_by
+from cloud_conversations.steps.context import NotYet, StepContext, StepError, finish_by
 from cloud_conversations.steps.failure import FailureKind, out_of_addresses, unusable_host
 from cloud_conversations.steps.failure import record as record_failure
 from cloud_conversations.steps.idempotency import derive_key
@@ -122,6 +122,12 @@ def reserve(ctx: StepContext, args: dict) -> dict:
             )
             lease = _create(False)
 
+        if finish_by() is not None and _until(lease.start) > ctx.settings.lease_active_s:
+            raise NotYet(
+                lease.start,
+                f"The lease at {ctx.site} starts at {lease.start:%Y-%m-%d %H:%M} UTC. "
+                "The build continues then.",
+            )
         active = ctx.adapter.wait_lease_active(
             ctx.site,
             lease.lease_id,
@@ -140,7 +146,7 @@ def reserve(ctx: StepContext, args: dict) -> dict:
     except CapacityError as exc:
         _failed(ctx, step_id, "reserve", "plan", exc)
         raise StepError(exc, "plan") from exc
-    except StepError:
+    except (StepError, NotYet):
         raise
     except Exception as exc:
         _failed(ctx, step_id, "reserve", "step", exc)

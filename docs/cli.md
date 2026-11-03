@@ -26,6 +26,7 @@
 | `ccx show-system-key` | List the SSH keys Cloud Conversations logs in to instances with, or `--private <fingerprint>` for one key's private half. |
 | `ccx rotate-system-key` | Replace the current system key. |
 | `ccx api` | Serve the chat page's API. |
+| `ccx worker --queue chat`, `ccx worker --queue runs` | Answer chat messages, or carry out builds and releases, one at a time. |
 
 ## Flags
 
@@ -51,6 +52,7 @@ Run `ccx <command> --help` for one command's flags.
 | `ask` | `--verbose` |
 | `index` | `--refresh`, `--use-cache` |
 | `api` | `--host`, `--port` |
+| `worker` | `--queue` |
 | `import-key` | `--name`, `--public-key` |
 | `add-local-user`, `set-local-password`, `delete-local-user` | `--name` |
 | `show-system-key` | `--private` |

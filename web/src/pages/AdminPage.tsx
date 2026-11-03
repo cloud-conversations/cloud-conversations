@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Failed } from "../components/Failed";
-import type { EveryoneLimit, ListedFeedback, UserSummary } from "../api/types";
+import type { EveryoneLimit, JobInProgress, ListedFeedback, UserSummary } from "../api/types";
 import {
   useAdminSettings,
   useAnnouncement,
   useClearAnnouncement,
   useFeedback,
+  useJobsInProgress,
   usePatchUser,
   usePostAnnouncement,
   useSetAdminSettings,
@@ -16,15 +17,15 @@ import { useRotateSystemKey, useSystemKeys } from "../hooks/useSystemKeys";
 import { QUOTA_LABELS } from "../quotas";
 import { stamp } from "../time";
 
-function AnnouncementSection() {
+function Announcement() {
   const current = useAnnouncement();
   const posted = usePostAnnouncement();
   const cleared = useClearAnnouncement();
   const [text, setText] = useState("");
 
   return (
-    <section>
-      <h1 className="text-xl font-bold text-cc-navy">Announcement</h1>
+    <div className="mt-4">
+      <h2 className="font-medium text-cc-navy">Announcement</h2>
       <p className="mt-1 text-sm text-grey">
         {current.data?.text
           ? `Every page shows: ${current.data.text}`
@@ -61,6 +62,73 @@ function AnnouncementSection() {
         </button>
       </form>
       <Failed error={posted.error ?? cleared.error} />
+    </div>
+  );
+}
+
+const JOB_KINDS: Record<JobInProgress["kind"], string> = { build: "Build", teardown: "Release" };
+
+function JobsInProgress() {
+  const jobs = useJobsInProgress();
+
+  return (
+    <div className="mt-6">
+      <h2 className="font-medium text-cc-navy">Builds and releases in progress</h2>
+      <Failed error={jobs.error} />
+      {jobs.data?.every((j) => j.state !== "running") && (
+        <p className="mt-1 text-sm text-grey">Nothing is running. It is safe to deploy.</p>
+      )}
+      {Boolean(jobs.data?.length) && (
+        <table className="mt-2 w-full text-sm">
+          <thead className="text-left text-grey">
+            <tr>
+              <th className="py-1 pr-4 font-medium">Job</th>
+              <th className="py-1 pr-4 font-medium">User</th>
+              <th className="py-1 pr-4 font-medium">Chat</th>
+              <th className="py-1 pr-4 font-medium">Site</th>
+              <th className="py-1 pr-4 font-medium">Started</th>
+              <th className="py-1 font-medium">Run</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(jobs.data ?? []).map((j) => (
+              <tr key={j.job_id} className="border-t border-grey-light">
+                <td className="py-2 pr-4">{JOB_KINDS[j.kind]}</td>
+                <td className="py-2 pr-4">{j.username}</td>
+                <td className="py-2 pr-4">{j.title}</td>
+                <td className="py-2 pr-4">{j.site ?? ""}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  {j.started_at ? stamp(j.started_at) : `queued ${stamp(j.created_at)}`}
+                </td>
+                <td className="py-2">{j.run_state ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function MaintenanceSection() {
+  const settings = useAdminSettings();
+  const setting = useSetAdminSettings();
+
+  return (
+    <section>
+      <h1 className="text-xl font-bold text-cc-navy">Maintenance</h1>
+      <label className="mt-1 flex items-center gap-2 text-sm text-grey-dark">
+        <input
+          type="checkbox"
+          checked={settings.data?.paused ?? false}
+          disabled={!settings.data || setting.isPending}
+          onChange={(e) => setting.mutate({ paused: e.target.checked })}
+        />
+        Pause builds and releases
+      </label>
+      <Failed error={settings.error ?? setting.error} />
+      <Announcement />
+      <JobsInProgress />
     </section>
   );
 }
@@ -358,7 +426,7 @@ export function AdminPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto p-6">
-        <AnnouncementSection />
+        <MaintenanceSection />
 
         <div className="mt-10 flex items-center gap-4">
           <h1 className="text-xl font-bold text-cc-navy">System keys</h1>

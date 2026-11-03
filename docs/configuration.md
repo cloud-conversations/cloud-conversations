@@ -103,8 +103,14 @@ Decline anything that would run longer than a working day.
 | Setting | Default | Sets |
 |---|---|---|
 | `host`, `port` | `127.0.0.1`, 8000 | the address `ccx api` binds. `--host` and `--port` override them. |
-| `broker_url` | `redis://localhost:6379/0` | Celery's broker. `CC_BROKER_URL` overrides it. |
-| `job_timeout_s` | 5400 | seconds a job may run. A chat build must have time to start its lease, boot, reach SSH and install its software within this. |
+| `db_connect_s`, `db_retry_s` | 30, 1 | seconds to keep trying to reach the database, and seconds between tries |
+| `job_timeout_s` | 5400 | seconds a job may run. Once its lease starts, a chat build must have time to boot, reach SSH and install its software within this. |
+| `job_claim_s` | 60 | seconds before another worker takes over the job of a worker that stopped |
+| `job_poll_s` | 1 | seconds an idle worker waits before looking for a job again |
+| `job_attempts` | 3 | times a job is started before it fails |
+| `build_grace_s` | 3600 | seconds late a build may still start, if nothing is reserved for it |
+| `lease_warning_s` | 3600 | seconds of warning a chat gets before its lease ends |
+| `lease_watch_s` | 300 | seconds between an idle worker's lease checks |
 | `route_history` | 6 | recent messages in the chat that the router reads |
 | `thread_title_chars` | 60 | characters of the first message to use as a chat's title |
 | `oidc_scope` | `openid profile email` | scopes to request from the login provider at login |
@@ -134,9 +140,8 @@ Decline anything that would run longer than a working day.
 | `CC_LLM_MODEL` | `llm_model` | the model at that endpoint. `--model` overrides it. |
 | `CC_LLM_TEMPERATURE` | `llm_temperature` | sampling temperature, 0 to 2. `--temperature` overrides it. |
 | `CC_LLM_API_KEY` | unset | the endpoint's key. Set it in the environment, not the config file. |
-| `CC_LOG_LEVEL` | unset | `INFO` to log resource creation and deletion. `DEBUG` to add every provider call and its latency. Pass celery's `--loglevel` to a worker on the host. |
-| `CC_RUNS_CONCURRENCY` | 2 | builds and releases the compose runs worker carries out at once, across all users. Pass celery's `-c` to a worker on the host. |
-| `CC_BROKER_URL` | `broker_url` | Celery's broker, for `ccx api` and the workers |
+| `CC_LOG_LEVEL` | unset | `INFO` to log resource creation and deletion. `DEBUG` to add every provider call and its latency. |
+| `CC_RUNS_CONCURRENCY` | 2 | how many runs workers compose starts. Each carries out one build or release at a time. |
 | `OS_CLOUD` and the other `OS_*` variables | unset | `ccx`'s login at each site. See [credentials.md](credentials.md). |
 | `HF_HOME` | `~/.cache/huggingface` | where the knowledge base's models download |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | the API that `npm run dev` sends `/api` to |

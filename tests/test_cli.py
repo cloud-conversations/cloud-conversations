@@ -52,7 +52,8 @@ def _live_resources() -> list[store.Resource]:
     """Every unreleased resource, across every run and owner."""
     with psycopg.connect(TEST_DB_URL, row_factory=dict_row) as conn:
         rows = conn.execute(
-            "SELECT * FROM experiments.run_resources WHERE released_at IS NULL"
+            "SELECT provider_id, kind, run_id, site, expires_at, created_at, released_at, "
+            "idempotency_key FROM experiments.run_resources WHERE released_at IS NULL"
         ).fetchall()
     return [store.Resource(**r) for r in rows]
 
