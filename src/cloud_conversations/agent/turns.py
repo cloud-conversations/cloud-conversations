@@ -80,6 +80,18 @@ class Turn(Generic[T_co]):
     fields: dict[str, Any] = field(default_factory=dict)
 
 
+def faults(exc: ValueError) -> list[str]:
+    """What is wrong with a reply, one line for each fault."""
+    if not isinstance(exc, ValidationError):
+        return [str(exc)]
+    lines = []
+    for error in exc.errors():
+        where = ".".join(str(part) for part in error["loc"])
+        said = error["msg"].removeprefix("Value error, ")
+        lines.append(f"{where}: {said}" if where else said)
+    return lines
+
+
 def retry(reasons: list[str]) -> str:
     joined = "\n".join(f"- {reason}" for reason in reasons)
     return f"That will not do:\n{joined}\n\nReply with one corrected JSON object."
@@ -109,8 +121,8 @@ def converse(
         try:
             step = steps.validate_python(loads(reply.text))
         except (ValueError, ValidationError) as exc:
-            rounds.append(round_type.of(number, "unparsed", reply, [str(exc)], sent))
-            messages.append({"role": "user", "content": retry([str(exc)])})
+            rounds.append(round_type.of(number, "unparsed", reply, faults(exc), sent))
+            messages.append({"role": "user", "content": retry(faults(exc))})
             continue
 
         turn = act(step)

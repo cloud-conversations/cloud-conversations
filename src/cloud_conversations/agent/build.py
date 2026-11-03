@@ -89,7 +89,7 @@ def build(
         try:
             step = _STEP.validate_python(loads(reply.text))
         except (ValueError, ValidationError) as exc:
-            rounds.append(turns.Round.of(number, "unparsed", reply, [str(exc)], sent))
+            rounds.append(turns.Round.of(number, "unparsed", reply, turns.faults(exc), sent))
             _record(owner_id, run_id, rounds[-1])
             continue
 

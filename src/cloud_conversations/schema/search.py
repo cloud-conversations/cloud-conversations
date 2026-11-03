@@ -7,11 +7,10 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from cloud_conversations.schema.description import ComputeKey
+from cloud_conversations.schema.reply import Reply
 
 
-class NodeQuery(BaseModel):
-    model_config = {"extra": "forbid"}
-
+class NodeQuery(Reply):
     reserve_by: ComputeKey
     site: str | None = None  # region name, or None for every site
     node_type: str | None = None  # bare metal

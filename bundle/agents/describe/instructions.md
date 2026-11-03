@@ -139,7 +139,8 @@ Software:
 
 - When the request names software, or a repository that needs it, give each piece as a
   requirement, with its source as for any other requirement. "PyTorch" infers a
-  pip_package torch.
+  pip_package torch. Each requirement is an entry in items, as in
+  {"key": "system_package", "value": "htop", "source": "stated"}.
 - Read every repository the request names before answering, including one named as the
   source of a package. A requirement its files name is stated, and its rationale names
   the file.
