@@ -49,18 +49,22 @@ def build_experiment(job: Job, config: Config) -> None:
     owner = job.owner_id
     description_id = uuid.UUID(str(job.payload["description_id"]))
     version = int(job.payload["version"])
-    replaced = job.payload.get("replaces_run_id")
-    old = store.get_run(owner, uuid.UUID(str(replaced))) if replaced is not None else None
+    rechecked = job.payload.get("rechecks_run_id")
+    old_id = job.payload.get("replaces_run_id") or rechecked
+    old = store.get_run(owner, uuid.UUID(str(old_id))) if old_id is not None else None
     desc = store.get_description(owner, description_id, version)
     site = desc.requirements.site
     if not site:
         raise ValueError(f"description {description_id} v{version} names no site")
 
     started = time.monotonic()
-    current = _current_run(job, description_id)
+    current = None if rechecked is not None else _current_run(job, description_id)
     if current is not None and current.state == RunState.abandoned:
         return
-    notice = _late_notice(job, current, desc.requirements, config.service.build_grace_s)
+    notice = (
+        None if rechecked is not None
+        else _late_notice(job, current, desc.requirements, config.service.build_grace_s)
+    )
     if notice is not None:
         if current is not None and current.state in _UNDERWAY:
             sequential.stop(current.run_id, notice)
@@ -78,7 +82,10 @@ def build_experiment(job: Job, config: Config) -> None:
     stop_by = started + config.service.job_timeout_s - settings.install_call_s
     request_id = uuid.UUID(str(job.payload["request_id"]))
     with audit.acting(owner, request_id), finishing_by(stop_by):
-        if current is not None:
+        if old is not None and rechecked is not None:
+            run_id = old.run_id
+            sequential.recheck(run_id, version, adapter, settings)
+        elif current is not None:
             run_id = current.run_id
             if current.state in _UNDERWAY:
                 if job.attempts > 1:

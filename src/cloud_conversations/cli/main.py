@@ -940,6 +940,19 @@ def _settle(
         version = proposal.version
         print(f"\n{proposal.shown}")
         run = store.get_run(owner, run_id)
+        if proposal.action == "resume" and version is not None:
+            if not _asked("Check the host again?"):
+                releases.decline(owner, proposal.request_id, "cli")
+                return run_id
+            releases.confirm(owner, proposal.request_id, "cli")
+            requirements = store.get_description(owner, run.description_id, version).requirements
+            request_id = proposal.request_id
+            with audit.acting(owner, request_id):
+                sequential.recheck(
+                    run_id, version, adapter,
+                    config.for_site(site, reservation_kind_of(requirements.items)),
+                )
+            continue
         if not _asked("Release them?"):
             releases.decline(owner, proposal.request_id, "cli")
             print("Kept them.")

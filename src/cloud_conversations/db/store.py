@@ -819,6 +819,17 @@ def update_run(
             raise NotFoundError(f"Run {run_id} not found for owner {owner_id!r}")
 
 
+def move_run(owner_id: str, run_id: uuid.UUID, version: int) -> None:
+    """Point a run at another version of its description."""
+    with _translate(), transaction() as c:
+        _lock_run(c, run_id)
+        c.execute(
+            "UPDATE experiments.runs SET description_version = %s, updated_at = now() "
+            "WHERE owner_id = %s AND run_id = %s",
+            [version, owner_id, run_id],
+        )
+
+
 def touch_heartbeat(run_id: uuid.UUID) -> None:
     """Mark a run as still alive. Not owner-scoped."""
     with _translate(), transaction() as c:

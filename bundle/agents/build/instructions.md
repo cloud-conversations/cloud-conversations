@@ -33,9 +33,15 @@ To change what was asked for, reply with a revise:
 Revise when the description asks for something that cannot be had here: hardware
 that is not free in this window, an image or a package that does not exist. The experiment
 description agent writes a new version. If this run holds anything, the user decides
-whether to release it and build that version as a new run. `change` is one sentence
-and is the only thing that reaches the experiment description agent, so say what to
-change and what to keep.
+whether to release it and build that version as a new run. `change` is one sentence,
+so say what to change and what to keep. The experiment description agent also sees
+what the host measured.
+
+Revise also when the host is right and a check is wrong: its expected value is in a
+form the host never reports, or it checks something the user did not ask for. Compare
+each failed check's expected and measured values, and name the checks to rewrite in
+`change`. Do not say how to rewrite them. If only the checks change, the user decides
+whether to check this host again with them.
 
 To stop, reply with an abandon:
 

@@ -203,6 +203,21 @@ describe("a chat", () => {
     ).toBeInTheDocument();
   });
 
+  it("asks to check the host again for a proposal that changes only the checks", async () => {
+    const recheck = { ...PROPOSED, payload: { request_id: "q1", version: 2, action: "resume" as const } };
+    serve(detail({ messages: [recheck] }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Check the host again" }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/releases/q1/confirm",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(screen.queryByRole("button", { name: /Release/ })).toBeNull();
+  });
+
   it("shows the user's answer in place of the buttons", async () => {
     serve(detail({ messages: [PROPOSED], decisions: { q1: "declined" } }));
 

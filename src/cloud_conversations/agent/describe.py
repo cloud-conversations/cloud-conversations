@@ -45,6 +45,7 @@ from cloud_conversations.knowledge.retrieve import KnowledgeBase
 from cloud_conversations.llm.client import Model
 from cloud_conversations.schema.description import Requirements
 from cloud_conversations.schema.search import Candidates, NodeQuery
+from cloud_conversations.validator.rubric import CheckResult
 
 _STEP: TypeAdapter[Step] = TypeAdapter(Step)
 
@@ -66,6 +67,7 @@ def propose(
     testbed: str,
     adapter: TestbedAdapter,
     by_user: bool = False,
+    measured: list[CheckResult] | None = None,
 ) -> tuple[ProposedDescription | DeclineStep | None, list[Round]]:
     """Run the loop. Returns the answer, a refusal, or None, and the transcript."""
     preferred = {"a VM": vm_site, "bare metal": baremetal_site}
@@ -74,7 +76,7 @@ def propose(
             "role": "system",
             "content": _system_prompt(testbed, catalog, settings, knowledge, preferred),
         },
-        {"role": "user", "content": _opening(prompt, prior, by_user)},
+        {"role": "user", "content": _opening(prompt, prior, by_user, measured)},
     ]
     asked: list[NodeQuery] = []
     questions: list[str] = []
@@ -247,18 +249,29 @@ def _system_prompt(
     return "\n".join(part for part in parts if part)
 
 
-def _opening(prompt: str, prior: Description | None, by_user: bool) -> str:
+def _opening(
+    prompt: str, prior: Description | None, by_user: bool, measured: list[CheckResult] | None
+) -> str:
     if prior is None:
         return prompt
     asked = (
         "A value you change for it is asked if the user gave it, or inferred, never default.\n\n"
         if by_user else ""
     )
+    host = (
+        "What the last host measured, for each check:\n"
+        + "".join(
+            f"  {r.check_id}: expected {r.expected!r}, measured {r.actual!r}\n" for r in measured
+        )
+        + "\n"
+        if measured else ""
+    )
     return (
         "This revises a description you already produced. Its current "
         f"requirements are:\n{prior.requirements.model_dump_json(indent=2)}\n\n"
         f"and its rubric is:\n"
         f"{json.dumps([c.model_dump() for c in prior.rubric], indent=2)}\n\n"
+        f"{host}"
         f"The change asked for is: {prompt}\n\n"
         f"{asked}"
         "Search again before answering: a different window or different hardware "

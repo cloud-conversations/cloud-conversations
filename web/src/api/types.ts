@@ -174,6 +174,7 @@ export interface Message {
     request_id?: string;
     /** The version a proposal replaces the run with. */
     version?: number | null;
+    action?: "release" | "release_and_build" | "resume";
   };
   description_id: string | null;
   description_version: number | null;

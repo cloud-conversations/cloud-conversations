@@ -665,6 +665,33 @@ def test_confirming_a_revision_queues_a_build_that_replaces_the_run(
     assert _audit(owner_a)[-1] == ("confirmed", "user", [_LEASE])
 
 
+def test_confirming_a_recheck_queues_a_build_that_checks_the_same_run(
+    client, run, owner_a, bm_requirements, bm_rubric
+):
+    store.record_resource(run, "lease-1", "lease", "FAKE@BM", None)
+    thread_id = store.list_threads(owner_a)[0].thread_id
+    store.update_thread(owner_a, thread_id, ssh_key_ref="cc-keypair")
+    description_id = store.get_run(owner_a, run).description_id
+    store.create_description(
+        owner_a, "test", bm_requirements.model_copy(update={"site": "FAKE@BM"}), bm_rubric,
+        description_id=description_id, parent_version=1,
+    )
+    store.update_run(owner_a, run, state=RunState.failed)
+    request_id = releases.offer_recheck(
+        owner_a, store.get_run(owner_a, run), "the os check is wrong",
+        {"checks": "the checks (os)"}, 2,
+    )
+
+    queued = client.post(f"/releases/{request_id}/confirm", headers=ALICE)
+
+    assert queued.status_code == 202
+    (job,) = store.unfinished_jobs(owner_a, thread_id)
+    assert job.payload == {
+        "description_id": str(description_id), "version": 2, "rechecks_run_id": str(run),
+        "request_id": str(request_id),
+    }
+
+
 def test_confirming_a_revision_while_paused_queues_its_build(
     client, run, owner_a, bm_requirements, bm_rubric
 ):

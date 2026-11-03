@@ -8,12 +8,13 @@ interface Props {
   decision: "confirmed" | "declined" | undefined;
 }
 
-/** The experiment agent's proposal to release a run. */
+/** The experiment agent's proposal to release a run, or to check its host again. */
 export function ReleaseMessage({ message, threadId, decision }: Props) {
   const confirmed = useConfirmRelease(threadId);
   const declined = useDeclineRelease(threadId);
   const requestId = message.payload.request_id ?? "";
   const version = message.payload.version;
+  const recheck = message.payload.action === "resume";
   const answering = confirmed.isPending || declined.isPending;
 
   return (
@@ -26,19 +27,29 @@ export function ReleaseMessage({ message, threadId, decision }: Props) {
             disabled={answering}
             className="px-3 py-1.5 rounded-md text-sm font-medium bg-brand-danger text-white disabled:opacity-40"
           >
-            {version ? `Release and build version ${version}` : "Release"}
+            {recheck
+              ? "Check the host again"
+              : version
+                ? `Release and build version ${version}`
+                : "Release"}
           </button>
           <button
             onClick={() => declined.mutate(requestId)}
             disabled={answering}
             className="px-3 py-1.5 rounded-md text-sm border border-grey-light bg-white hover:bg-grey-lighter disabled:opacity-40"
           >
-            Keep
+            {recheck ? "Don't check" : "Keep"}
           </button>
         </div>
       ) : (
         <p className="mt-3 text-sm text-grey">
-          {decision === "confirmed" ? "You confirmed the release." : "You kept them."}
+          {recheck
+            ? decision === "confirmed"
+              ? "You confirmed checking the host again."
+              : "You declined checking the host again."
+            : decision === "confirmed"
+              ? "You confirmed the release."
+              : "You kept them."}
         </p>
       )}
       <Failed error={confirmed.error ?? declined.error} />

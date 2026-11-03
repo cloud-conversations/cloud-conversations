@@ -603,6 +603,17 @@ def resume(run_id: uuid.UUID, adapter: TestbedAdapter, settings: Settings) -> No
             )
 
 
+def recheck(
+    run_id: uuid.UUID, version: int, adapter: TestbedAdapter, settings: Settings
+) -> None:
+    """Check a failed run's host again, against another version of its description."""
+    run = store.get_run_unscoped(run_id)
+    if run.state in SETTLED_STATES:
+        return
+    store.move_run(run.owner_id, run_id, version)
+    resume(run_id, adapter, settings)
+
+
 def stop(run_id: uuid.UUID, reason: str) -> None:
     """Mark an unfinished run failed."""
     run = store.get_run_unscoped(run_id)

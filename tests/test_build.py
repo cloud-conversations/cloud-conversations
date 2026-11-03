@@ -49,6 +49,7 @@ _RUBRIC = [
 _WRONG_RUBRIC = [
     Check(id="os", kind="os_release", expected="Ubuntu 22.04", comparator="prefix",
           from_requirement="os_release"),
+    Check(id="ssh", kind="ssh_reachable", expected=True, comparator="eq"),
 ]
 
 
@@ -270,7 +271,7 @@ def test_a_revision_of_a_run_that_holds_hardware_waits_for_the_user_to_release_i
         held = store.live_resources(run_id)
         assert held, "the failed run still holds its hardware"
 
-        model = FakeModel([_revise(), _search(), _answer()])
+        model = FakeModel([_revise(), _search(hours=4), _answer(hours=4)])
         final, rounds = _drive(model, owner_a, run_id, adapter, config, settings)
 
     assert [t.action for t in rounds] == ["revise"]
@@ -342,7 +343,10 @@ def test_a_revision_to_a_longer_lease_waits_for_the_users_approval(owner_a):
 
     assert final == run_id, "nothing new was provisioned"
     proposal = store.pending_release(owner_a, run_id)
-    assert proposal is not None and proposal.detail["changes"] == "the lease length"
+    assert proposal is not None and proposal.detail["changes"] == (
+        "the lease length, the checks "
+        "(os_release starts with 'Ubuntu 22.04' becomes os_release starts with 'Ubuntu 24.04')"
+    )
     assert [p["result"] for p in _payloads(owner_a, run_id, "tool_called")] == [
         "version 2 replaces this run, so it waits for the user to release it"
     ]
@@ -364,8 +368,8 @@ def _revision_awaiting(
             description_id=description_id, description_version=1,
         )
         _drive(
-            FakeModel([_revise(), _search(), _answer()]), owner, run_id, adapter, config,
-            settings,
+            FakeModel([_revise(), _search(hours=4), _answer(hours=4)]), owner, run_id,
+            adapter, config, settings,
         )
     return run_id, adapter, config
 
@@ -393,6 +397,89 @@ def _replacement(owner: str, run_id: uuid.UUID) -> store.Run:
     description_id = store.get_run(owner, run_id).description_id
     return next(
         r for r in store.runs_for_description(owner, description_id) if r.description_version == 2
+    )
+
+
+def _checks_only_revision(owner: str) -> tuple[uuid.UUID, FaultyAdapter, Config, FakeModel]:
+    """A failed run holding hardware, with a revision of only its checks proposed."""
+    settings = _settings()
+    with serving(_TWO_FREE) as (root, _):
+        config = _config(settings, root)
+        adapter = _adapter(config)
+        run_id = _start(owner, adapter, settings, rubric=_WRONG_RUBRIC)
+        model = FakeModel([_revise("rewrite the os check"), _search(), _answer()])
+        _drive(model, owner, run_id, adapter, config, settings)
+    return run_id, adapter, config, model
+
+
+def test_a_revision_of_only_the_checks_asks_to_check_the_same_host_again(owner_a):
+    run_id, _, _, _ = _checks_only_revision(owner_a)
+
+    proposal = store.pending_release(owner_a, run_id)
+    assert proposal is not None
+    assert (proposal.action, proposal.version) == ("resume", 2)
+    assert proposal.shown == (
+        "The experiment agent wants to check this run's host again with version 2, which "
+        "changes the checks (os_release starts with 'Ubuntu 22.04' becomes os_release starts "
+        "with 'Ubuntu 24.04'). It says: no such image"
+    )
+
+
+def test_a_revision_shows_the_description_agent_what_the_host_measured(owner_a):
+    _, _, _, model = _checks_only_revision(owner_a)
+
+    (opening,) = [m["content"] for m in model.calls[1] if m["role"] == "user"]
+    assert "  os: expected 'Ubuntu 22.04', measured 'Ubuntu 24.04'\n" in opening
+
+
+def test_a_confirmed_recheck_checks_the_same_host_with_the_new_checks(owner_a, monkeypatch):
+    run_id, adapter, config, _ = _checks_only_revision(owner_a)
+    held = store.live_resources(run_id)
+    proposal = store.pending_release(owner_a, run_id)
+    assert proposal is not None and proposal.thread_id is None
+    chat = store.create_thread(owner_a, "a chat")
+    releases.confirm(owner_a, proposal.request_id, "web")
+    job = store.enqueue_job(owner_a, chat.thread_id, "build", {
+        "description_id": str(store.get_run(owner_a, run_id).description_id),
+        "version": 2,
+        "rechecks_run_id": str(run_id),
+        "request_id": str(proposal.request_id),
+    })
+    monkeypatch.setattr(
+        runs.credentials, "build_adapter", lambda site, config, user=None: audited(adapter)
+    )
+
+    runs.build_experiment(job, config)
+
+    run = store.get_run(owner_a, run_id)
+    assert (run.state, run.description_version) == (RunState.passed, 2)
+    assert store.live_resources(run_id) == held
+    assert len(store.runs_for_description(owner_a, run.description_id)) == 1
+
+
+def test_a_revision_of_only_the_checks_of_a_run_that_holds_nothing_asks_for_approval(owner_a):
+    settings = _settings()
+    with serving(_TWO_FREE) as (root, _):
+        config = _config(settings, root)
+        adapter = _adapter(config)
+        run_id = _start(owner_a, adapter, settings, rubric=_WRONG_RUBRIC)
+        description_id = store.get_run(owner_a, run_id).description_id
+        chat = store.create_thread(owner_a, "a chat")
+        store.append_message(
+            chat.thread_id, "assistant", "description", "a description", owner_id=owner_a,
+            description_id=description_id, description_version=1,
+        )
+        for r in store.live_resources(run_id):
+            store.release_resource_with_event(run_id, r.kind, r.provider_id, r.site)
+        model = FakeModel([_revise(), _search(), _answer()])
+        _drive(model, owner_a, run_id, adapter, config, settings)
+
+    built = store.runs_for_description(owner_a, description_id)
+    assert [r.description_version for r in built] == [1]
+    last = store.read_messages(owner_a, chat.thread_id)[-1]
+    assert last.text == (
+        "Version 2 changes the checks (os_release starts with 'Ubuntu 22.04' becomes "
+        "os_release starts with 'Ubuntu 24.04') from version 1. Approve it to build it."
     )
 
 
@@ -935,3 +1022,22 @@ def test_a_second_question_reaches_the_knowledge_base(owner_a):
         "what makes a host unschedulable?",
         "which image boots on skylake?",
     ]
+
+
+def test_a_revision_names_each_check_it_adds_changes_or_drops():
+    from cloud_conversations.agent.revision import _check_changes
+
+    ssh = Check(id="ssh", kind="ssh_reachable", expected=True, comparator="eq")
+    cpus = Check(id="cpus", kind="cpu_count", expected=24, comparator="gte")
+
+    arch = Check(id="arch", kind="cpu_arch", expected="x86_64", comparator="eq")
+    revised = [_RUBRIC[0], ssh, cpus.model_copy(update={"expected": 48}), arch]
+
+    changed = _check_changes([*_WRONG_RUBRIC, cpus], revised)
+
+    assert changed == (
+        "the checks (os_release starts with 'Ubuntu 22.04' becomes os_release starts with "
+        "'Ubuntu 24.04'; cpu_count is at least 24 becomes cpu_count is at least 48; "
+        "adds cpu_arch is 'x86_64')"
+    )
+    assert _check_changes([ssh], []) == "the checks (drops ssh_reachable is True)"

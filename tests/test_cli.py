@@ -203,6 +203,44 @@ def test_build_asks_before_the_agent_releases_anything(monkeypatch, capsys, owne
     ]
 
 
+def test_build_checks_the_same_host_again_once_the_user_says_so(monkeypatch, owner_env):
+    testbed: list[FaultyAdapter] = []
+
+    def one_lying_adapter(**kwargs):
+        if not testbed:
+            testbed.append(FaultyAdapter(**kwargs, facts_overrides={"cc-": HostFacts(cpu_count=1)}))
+        return testbed[0]
+
+    monkeypatch.setattr("cloud_conversations.adapter.credentials.FakeAdapter", one_lying_adapter)
+    _main(["run", "--fixture", "baremetal"], monkeypatch)
+    held = _live_resources()
+    run = store.get_run(owner_env, held[0].run_id)
+    v1 = store.get_description(owner_env, run.description_id, 1)
+    store.create_description(
+        owner_env, "test", v1.requirements,
+        [c.model_copy(update={"expected": 1}) if c.kind == "cpu_count" else c for c in v1.rubric],
+        description_id=run.description_id, parent_version=1,
+    )
+
+    def revised(owner, run_id, *args):
+        if store.get_run(owner, run_id).description_version == 1:
+            releases.offer_recheck(
+                owner, store.get_run(owner, run_id), "the check is wrong",
+                {"checks": "the checks (cpu_count)"}, 2,
+            )
+        return run_id
+
+    monkeypatch.setattr("cloud_conversations.cli.main._recover", revised)
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+
+    _main(["build", "--run-id", str(run.run_id)], monkeypatch)
+
+    rechecked = store.get_run(owner_env, run.run_id)
+    assert (rechecked.state.value, rechecked.description_version) == ("passed", 2)
+    assert _live_resources() == held
+    assert _decisions(owner_env)[-1] == ("confirmed", "resume", "user", "cli")
+
+
 def test_build_does_not_ask_again_about_a_proposal_from_before(
     monkeypatch, capsys, owner_env
 ):
