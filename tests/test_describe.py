@@ -86,6 +86,21 @@ def test_malformed_json_produces_a_reason_and_the_loop_continues():
     assert "That will not do" in model.calls[1][-1]["content"]
 
 
+def test_a_field_the_description_does_not_have_is_answered_with_the_fields_it_does():
+    wrong = json.loads(answer_reply())
+    wrong["description"]["requirements"] = [{"key": "system_package", "value": "htop"}]
+    _, rounds, model, _ = _run([search_reply(), json.dumps(wrong), answer_reply()])
+
+    assert rounds[1].reasons == [
+        "answer.description: there is no field 'requirements'; the fields are site, "
+        "start_at, start_source, duration_hours, duration_source, items, rubric, "
+        "unsupported, open_questions"
+    ]
+    assert model.calls[2][-1]["content"].startswith(
+        "That will not do:\n- answer.description: there is no field 'requirements'"
+    )
+
+
 def test_model_prose_is_bounded():
     long = "x" * 400
     proposal, rounds, _, _ = _run(

@@ -7,9 +7,10 @@ import re
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from cloud_conversations.schema.description import Note, Requirement, Source
+from cloud_conversations.schema.reply import Reply
 from cloud_conversations.schema.search import NodeQuery
 from cloud_conversations.validator.rubric import Check
 
@@ -25,10 +26,8 @@ def loads(text: str) -> Any:
     return json.loads(fenced.group(1) if fenced else stripped)
 
 
-class ProposedDescription(BaseModel):
+class ProposedDescription(Reply):
     """An answer in the catalog's vocabulary."""
-
-    model_config = {"extra": "forbid"}
 
     site: str
     start_at: datetime | None = None
@@ -44,53 +43,41 @@ class ProposedDescription(BaseModel):
         return next((item.value for item in self.items if item.key == key), None)
 
 
-class SearchStep(BaseModel):
-    model_config = {"extra": "forbid"}
-
+class SearchStep(Reply):
     action: Literal["search"]
     query: NodeQuery
 
 
-class KnowledgeStep(BaseModel):
+class KnowledgeStep(Reply):
     """A question for the knowledge base."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["search_knowledge_base"]
     question: Note
 
 
-class ImageSearchStep(BaseModel):
+class ImageSearchStep(Reply):
     """A search of one site's images by name."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["search_images"]
     site: str
     text: Note
 
 
-class ReadRepositoryStep(BaseModel):
+class ReadRepositoryStep(Reply):
     """A read of a repository's setup files."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["read_repository"]
     url: str
     ref: str | None = None
 
 
-class AnswerStep(BaseModel):
-    model_config = {"extra": "forbid"}
-
+class AnswerStep(Reply):
     action: Literal["answer"]
     description: ProposedDescription
 
 
-class DeclineStep(BaseModel):
+class DeclineStep(Reply):
     """A refusal."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["decline"]
     reason: Note
@@ -107,10 +94,8 @@ Step = Annotated[
 Route = Literal["describe", "revise", "build", "inventory", "ask"]
 
 
-class RouteStep(BaseModel):
+class RouteStep(Reply):
     """Where one message goes."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["route"]
     route: Route
@@ -124,36 +109,28 @@ Read = Literal[
 ]
 
 
-class InspectStep(BaseModel):
-    model_config = {"extra": "forbid"}
-
+class InspectStep(Reply):
     action: Literal["inspect"]
     read: Read
 
 
-class RetryStep(BaseModel):
+class RetryStep(Reply):
     """Run the same plan again."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["retry"]
     reason: Note
 
 
-class ReviseStep(BaseModel):
+class ReviseStep(Reply):
     """A change to the description."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["revise"]
     change: Note
     reason: Note
 
 
-class AbandonStep(BaseModel):
+class AbandonStep(Reply):
     """Release everything and stop."""
-
-    model_config = {"extra": "forbid"}
 
     action: Literal["abandon"]
     reason: Note
