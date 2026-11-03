@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Generic, Self, TypeVar
@@ -82,6 +83,8 @@ class Turn(Generic[T_co]):
 
 def faults(exc: ValueError) -> list[str]:
     """What is wrong with a reply, one line for each fault."""
+    if isinstance(exc, json.JSONDecodeError) and exc.msg == "Extra data":
+        return ["the reply holds more than one JSON object; send one"]
     if not isinstance(exc, ValidationError):
         return [str(exc)]
     lines = []

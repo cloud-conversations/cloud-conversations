@@ -268,6 +268,17 @@ def test_an_image_search_lists_supported_images_first_and_quotes_every_name(fake
     ]
 
 
+def test_an_image_search_finds_a_name_written_with_spaces(fake_adapter):
+    from cloud_conversations.agent.catalog import render_image_search
+
+    doc = get_catalog(fake_adapter, FAST).site(KVM_SITE)
+    assert doc is not None
+
+    assert render_image_search(doc, "Ubuntu 24", 5).splitlines()[1:] == [
+        "  'CC-Ubuntu24.04'  supported",
+    ]
+
+
 def test_an_image_search_lists_supported_images_then_the_newest(fake_adapter):
     from datetime import datetime, timezone
 
