@@ -80,6 +80,8 @@ Rules:
   host reports, such as Ubuntu 24.04. An image name is never an os_release:
   CC-Ubuntu24.04 boots Ubuntu 24.04. Where the catalog lists a site's images, also
   name the one to boot with an image_name requirement.
+  A release named by its major version, as in "Ubuntu 26", is the image the catalog
+  lists for it, as in CC-Ubuntu26.04. It needs no image search.
   Name an image the testbed does not support only if the request asks for it, or no
   supported image meets the request, and say so in open_questions.
   An ARM64 image boots only on an aarch64 node type, and an image with no

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime
 from typing import Any, get_args
 
@@ -228,8 +229,8 @@ def _image_lines(doc: SiteDoc) -> list[str]:
 
 def render_image_search(doc: SiteDoc, text: str, limit: int) -> str:
     """The site's images whose names contain text, as prompt text, at most limit of them."""
-    wanted = text.strip().lower()
-    matched = [i for i in doc.images if wanted in i.name.lower()]
+    wanted = _letters_and_digits(text)
+    matched = [i for i in doc.images if wanted in _letters_and_digits(i.name)]
     if not matched:
         return f"No image at {doc.site} has a name containing {text!r}."
     supported = {i.name for i in matched if i.supported}
@@ -252,6 +253,10 @@ def render_image_search(doc: SiteDoc, text: str, limit: int) -> str:
     if len(ranked) > limit:
         lines.append(f"  ... and {len(ranked) - limit} more; search with more specific text")
     return "\n".join(lines)
+
+
+def _letters_and_digits(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
 def _safe_name(name: str) -> str:

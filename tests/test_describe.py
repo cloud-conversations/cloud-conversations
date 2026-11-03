@@ -101,6 +101,12 @@ def test_a_field_the_description_does_not_have_is_answered_with_the_fields_it_do
     )
 
 
+def test_a_reply_of_two_objects_is_told_to_send_one():
+    _, rounds, _, _ = _run([search_reply() + "\n" + search_reply(), search_reply(), answer_reply()])
+
+    assert rounds[0].reasons == ["the reply holds more than one JSON object; send one"]
+
+
 def test_model_prose_is_bounded():
     long = "x" * 400
     proposal, rounds, _, _ = _run(
