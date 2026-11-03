@@ -107,7 +107,8 @@ def build_replacement(
     site = requirements.site
     if not site:
         raise ValueError(f"description {old.description_id} v{version} names no site")
-    new_run = sequential.provision(
+    settings = config.for_site(site, reservation_kind_of(requirements.items))
+    new_run = sequential.plan_run(
         owner_id=owner_id,
         description_id=old.description_id,
         version=version,
@@ -115,9 +116,10 @@ def build_replacement(
         keypair=keypair,
         adapter=adapter,
         site=site,
-        settings=config.for_site(site, reservation_kind_of(requirements.items)),
+        settings=settings,
     )
     record_revision(owner_id, new_run, old.run_id, old.description_version, version, change)
+    sequential.execute(new_run, adapter, settings)
     return new_run
 
 

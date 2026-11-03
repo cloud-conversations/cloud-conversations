@@ -455,12 +455,13 @@ def test_a_public_url_that_is_not_a_web_address_is_named(monkeypatch):
 
 
 def test_a_worker_will_not_start_without_the_login_settings(monkeypatch):
-    from cloud_conversations.worker.app import _require_login_settings
+    from cloud_conversations.config import load_config
+    from cloud_conversations.worker.loop import require_login_settings
 
     monkeypatch.delenv("CC_OIDC_CHAMELEON_CLIENT_SECRET")
 
     with pytest.raises(SystemExit) as raised:
-        _require_login_settings()
+        require_login_settings(load_config())
     assert str(raised.value) == (
         "ERROR: the worker needs the login settings: CC_OIDC_CHAMELEON_CLIENT_SECRET is unset"
     )

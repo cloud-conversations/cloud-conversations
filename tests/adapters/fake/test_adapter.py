@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+import cloud_conversations.db.store as store
 from cloud_conversations.adapter.errors import (
     FatalError,
     NoAddressError,
@@ -36,6 +37,23 @@ def test_availability_reflects_existing_leases(run_id):
         idempotency_key="k1",
     )
     assert adapter.find_availability(BM_SITE, "compute_skylake", None, 2.0) == []
+
+
+def test_a_lease_made_before_the_worker_stopped_is_recorded_not_made_again(
+    fake_adapter, run_id, interrupted
+):
+    def create():
+        return fake_adapter.create_lease(
+            BM_SITE, duration_hours=2.0, node_type="compute_skylake",
+            run_id=run_id, idempotency_key="k1",
+        )
+
+    interrupted(create)
+    lease = create()
+
+    assert list(fake_adapter.leases) == [lease.lease_id]
+    assert [r.provider_id for r in store.live_resources(run_id)] == [lease.lease_id]
+    assert store.planned_resources(run_id) == []
 
 
 def test_lease_starts_pending_then_active(fake_adapter, run_id):

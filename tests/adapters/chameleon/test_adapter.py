@@ -28,6 +28,7 @@ from cloud_conversations.adapter.errors import (
     TransientError,
     UnschedulableError,
 )
+from cloud_conversations.config import resource_name
 from cloud_conversations.schema.search import NodeQuery
 from tests.conftest import FAST, PUBLISHED_CONFIG
 from tests.loopback import node, page, serving
@@ -41,7 +42,12 @@ class _StubBlazarLease:
         self._p.create_calls.append(
             {"name": name, "start": start, "end": end, "reservations": reservations}
         )
+        if self._p.lease_json is not None:
+            self._p.leases.append(self._p.lease_json)
         return self._p.lease_json
+
+    def list(self):
+        return self._p.leases
 
     def get(self, lease_id, detail=False):
         if self._p.lease_json is None:
@@ -88,6 +94,7 @@ class _StubBlazar:
         self.availability_calls: list[dict[str, Any]] = []
         self.raise_on_delete: Exception | None = None
         self.lease_json: dict[str, Any] | None = None
+        self.leases: list[dict[str, Any]] = []
         self.hosts: list[dict[str, Any]] = []
         self.host_list_failures = 0
         self.host_list_attempts = 0
@@ -132,7 +139,13 @@ class _StubNovaServers:
 
     def create(self, **kwargs):
         self._p.create_kwargs.append(kwargs)
-        return _StubServer("srv-1", kwargs["name"])
+        server = _StubServer(f"srv-{len(self._p.create_kwargs)}", kwargs["name"])
+        server.metadata = kwargs["meta"]
+        self._p.made.append(server)
+        return server
+
+    def list(self):
+        return self._p.made
 
     def get(self, sid):
         if self._p.raise_on_get is not None:
@@ -163,6 +176,7 @@ class _StubNovaFlavors:
 class _StubNova:
     def __init__(self) -> None:
         self.create_kwargs: list[dict[str, Any]] = []
+        self.made: list[_StubServer] = []
         self.raise_on_get: Exception | None = None
         self.raise_on_delete: Exception | None = None
         self.get_status = "BUILD"
@@ -241,13 +255,35 @@ class _StubNeutron:
         self.updated: list[tuple[str, dict]] = []
         self.deleted: list[str] = []
         self.created: list[dict] = []
+        self.groups: list[dict[str, Any]] = []
+        self.rules: list[dict] = []
 
     def list_networks(self, name):
         return {"networks": [{"id": f"net-{name}", "name": name}]}
 
     def create_floatingip(self, body):
         self.created.append(body)
-        return {"floatingip": {"floating_ip_address": "192.0.2.9"}}
+        fip = {
+            "id": f"fip-{len(self.created)}",
+            "floating_ip_address": "192.0.2.9",
+            "description": body["floatingip"].get("description"),
+        }
+        self.fips.append(fip)
+        return {"floatingip": fip}
+
+    def create_security_group(self, body):
+        group = {"id": f"sg-{len(self.groups) + 1}", "name": body["security_group"]["name"]}
+        self.groups.append(group)
+        return {"security_group": group}
+
+    def list_security_groups(self, name):
+        return {"security_groups": [g for g in self.groups if g["name"] == name]}
+
+    def create_security_group_rule(self, body):
+        group_id = body["security_group_rule"]["security_group_id"]
+        if any(r["security_group_rule"]["security_group_id"] == group_id for r in self.rules):
+            raise _Conflict("Security group rule already exists")
+        self.rules.append(body)
 
     def list_floatingips(self, floating_ip_address=None):
         return {
@@ -265,6 +301,10 @@ class _StubNeutron:
 
     def delete_floatingip(self, fip_id):
         self.deleted.append(fip_id)
+
+
+class _Conflict(Exception):
+    status_code = 409
 
 
 class _StubAuth(keystoneauth1.plugin.BaseAuthPlugin):
@@ -421,7 +461,9 @@ def test_an_address_is_allocated_from_the_floating_ip_pool(chameleon, stubs, run
     address = chameleon.allocate_floating_ip("CHI@UC", run_id=run_id, idempotency_key="k1")
 
     assert address == "192.0.2.9"
-    assert stubs.neutron.created == [{"floatingip": {"floating_network_id": "net-public"}}]
+    assert stubs.neutron.created == [
+        {"floatingip": {"floating_network_id": "net-public", "description": "k1"}}
+    ]
 
 
 def test_lease_records_a_resource_with_expiry(chameleon, stubs, run_id):
@@ -751,6 +793,98 @@ def test_boot_records_the_expiry_it_was_given(chameleon, run_id):
     )
     inst = next(r for r in store.live_resources(run_id) if r.kind == "instance")
     assert inst.expires_at == expiry
+
+
+def test_a_lease_made_before_the_worker_stopped_is_recorded_not_made_again(
+    chameleon, stubs, run_id, interrupted
+):
+    stubs.blazar.lease_json = {**_lease_json(status="PENDING"), "name": resource_name(run_id)}
+
+    def create():
+        chameleon.create_lease(
+            "CHI@UC", duration_hours=2.0, node_type="compute_skylake",
+            run_id=run_id, idempotency_key="k1",
+        )
+
+    interrupted(create)
+    create()
+
+    assert len(stubs.blazar.create_calls) == 1
+    assert [r.provider_id for r in store.live_resources(run_id)] == ["lease-1"]
+
+
+def test_an_instance_made_before_the_worker_stopped_is_found_by_its_key(
+    chameleon, stubs, run_id, interrupted
+):
+    def boot():
+        chameleon.launch_instance(
+            "CHI@UC", image_id="img-2204", keypair_name="cc-keypair", name="cc-x",
+            reservation_id="res-1", run_id=run_id, idempotency_key="k1",
+        )
+
+    boot()
+    store.release_resource_with_event(run_id, "instance", "srv-1", "CHI@UC")
+    interrupted(boot)
+    boot()
+
+    assert len(stubs.nova.create_kwargs) == 2
+    assert [r.provider_id for r in store.live_resources(run_id)] == ["srv-2"]
+
+
+def test_an_address_made_before_the_worker_stopped_is_found_by_its_key(
+    chameleon, stubs, run_id, interrupted
+):
+    def allocate():
+        return chameleon.allocate_floating_ip("CHI@UC", run_id=run_id, idempotency_key="k1")
+
+    interrupted(allocate)
+
+    assert allocate() == "192.0.2.9"
+    assert len(stubs.neutron.created) == 1
+    assert [r.provider_id for r in store.live_resources(run_id)] == ["192.0.2.9"]
+
+
+def test_a_security_group_made_before_the_worker_stopped_is_recorded_not_made_again(
+    chameleon, stubs, run_id, interrupted
+):
+    def ensure():
+        chameleon.ensure_security_group(
+            "CHI@UC", name=resource_name(run_id), run_id=run_id, idempotency_key="k1"
+        )
+
+    interrupted(ensure)
+    ensure()
+
+    assert [g["id"] for g in stubs.neutron.groups] == ["sg-1"]
+    assert len(stubs.neutron.rules) == 1
+    assert [r.provider_id for r in store.live_resources(run_id)] == ["sg-1"]
+
+
+def test_a_security_group_made_before_its_rule_admits_ssh_on_the_next_attempt(
+    chameleon, stubs, run_id, monkeypatch
+):
+    def ensure():
+        chameleon.ensure_security_group(
+            "CHI@UC", name=resource_name(run_id), run_id=run_id, idempotency_key="k1"
+        )
+
+    with monkeypatch.context() as m:
+        m.setattr(stubs.neutron, "create_security_group_rule", _raises(RuntimeError("stopped")))
+        with pytest.raises(FatalError):
+            ensure()
+    ensure()
+
+    assert [g["id"] for g in stubs.neutron.groups] == ["sg-1"]
+    assert [r["security_group_rule"]["security_group_id"] for r in stubs.neutron.rules] == [
+        "sg-1"
+    ]
+
+
+def _raises(exc: Exception):
+    def call(*args, **kwargs):
+        raise exc
+
+    return call
 
 
 @pytest.mark.parametrize(

@@ -7,6 +7,7 @@ import type {
   FeedbackPage,
   ImportedKey,
   Job,
+  JobInProgress,
   KeyDeleted,
   Me,
   Posted,
@@ -136,6 +137,10 @@ export function patchAdminSettings(changes: object): Promise<AdminSettings> {
     method: "PATCH",
     body: JSON.stringify(changes),
   });
+}
+
+export function fetchJobsInProgress(): Promise<JobInProgress[]> {
+  return apiFetch<JobInProgress[]>("/admin/jobs");
 }
 
 function userPath(userId: string): string {

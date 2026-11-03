@@ -59,6 +59,7 @@ from cloud_conversations.schema.description import (
 )
 from cloud_conversations.schema.knowledge import Document, Knowledge, SourceState
 from cloud_conversations.schema.runs import IllegalTransitionError, RunState
+from cloud_conversations.schema.service import QUEUES
 from cloud_conversations.validator.rubric import SOFTWARE_KINDS, Check
 
 log = logging.getLogger(__name__)
@@ -1263,6 +1264,15 @@ def cmd_api(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_worker(args: argparse.Namespace) -> int:
+    from cloud_conversations.worker import loop
+
+    config = _config_from(args)
+    loop.require_login_settings(config)
+    loop.run(QUEUES[args.queue], config)
+    return 0
+
+
 def _drop_query_string(record: logging.LogRecord) -> bool:
     if isinstance(record.args, tuple) and len(record.args) == 5:
         client, method, path, version, status = record.args
@@ -1761,6 +1771,9 @@ def main() -> None:
     p_api.add_argument("--host", default=None, help="Interface to bind; default from [service]")
     p_api.add_argument("--port", type=int, default=None, help="Port to bind")
 
+    p_worker = sub.add_parser("worker", help="Carry out the chat page's jobs", parents=[common])
+    p_worker.add_argument("--queue", required=True, choices=sorted(QUEUES))
+
     p_cap = sub.add_parser("capabilities", help="Show the configured sites", parents=[common])
     p_cap.add_argument(
         "--site", default=None, help="Also list this site's node types, read live"
@@ -1817,6 +1830,7 @@ def main() -> None:
         "teardown": cmd_teardown,
         "resume": cmd_resume,
         "api": cmd_api,
+        "worker": cmd_worker,
         "capabilities": cmd_capabilities,
         "import-key": cmd_import_key,
         "show-keys": cmd_show_keys,

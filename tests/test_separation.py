@@ -15,7 +15,7 @@ import cloud_conversations.db.store as store
 from cloud_conversations import releases
 from cloud_conversations.api.app import app
 from cloud_conversations.api.deps import session_hash
-from tests.conftest import ALICE, BOB, LOGIN, TEST_DB_URL
+from tests.conftest import ALICE, BOB, LOGIN, TEST_DB_URL, queued_jobs
 
 pytestmark = pytest.mark.usefixtures("logged_in")
 
@@ -140,14 +140,14 @@ def _call(client, method, path, body, alices, headers):
 
 @pytest.mark.parametrize(("method", "path", "body"), _ROUTES, ids=_ROUTE_IDS)
 def test_alice_reaches_her_own_data_through_each_route(
-    client, dispatched, alices, method, path, body
+    client, alices, method, path, body
 ):
     assert _call(client, method, path, body, alices, ALICE).status_code not in (401, 403, 404)
 
 
 @pytest.mark.parametrize(("method", "path", "body"), _ROUTES, ids=_ROUTE_IDS)
 def test_bob_reaches_none_of_alices_data_through_a_route(
-    client, dispatched, alices, method, path, body
+    client, alices, method, path, body
 ):
     before = _snapshot()
 
@@ -155,7 +155,7 @@ def test_bob_reaches_none_of_alices_data_through_a_route(
 
     assert reply.status_code == 404
     assert _snapshot() == before
-    assert dispatched == []
+    assert queued_jobs() == []
     for marker in (_ALICES_TITLE, _ALICES_LEASE, alices["keypair_name"], "chameleon:alice"):
         assert marker not in reply.text
 
@@ -188,9 +188,9 @@ def test_every_route_that_takes_an_id_is_in_the_separation_table():
 _RUNNER_ONLY = {
     "get_run_unscoped", "touch_heartbeat", "record_resource", "create_resource_with_event",
     "resource_by_idempotency_key", "release_resource_with_event",
-    "start_job", "route_job", "finish_job",
+    "claim_job", "renew_claim", "give_up_claim", "route_job", "finish_job",
 }
-_WORKER_MAY = {"start_job", "route_job", "finish_job"}
+_WORKER_MAY = {"claim_job", "renew_claim", "give_up_claim", "route_job", "finish_job"}
 
 
 def _store_calls(package: str) -> set[str]:

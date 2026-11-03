@@ -133,7 +133,20 @@ export interface EveryoneLimit {
 
 export interface AdminSettings {
   require_approval: boolean;
+  paused: boolean;
   limits: EveryoneLimit[];
+}
+
+export interface JobInProgress {
+  job_id: string;
+  kind: "build" | "teardown";
+  state: "queued" | "running";
+  username: string;
+  title: string;
+  site: string | null;
+  run_state: string | null;
+  created_at: string;
+  started_at: string | null;
 }
 
 export interface Announcement {

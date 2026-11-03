@@ -10,7 +10,7 @@ Cloud Conversations builds experiment environments on a research testbed from a 
 | Chameleon | The `integration` extra, [credentials](docs/credentials.md), `CC_SECRET_KEY` ([generate it](docs/login.md)), and a keypair at the site or a key imported with `ccx import-key` |
 | `ccx describe`, `ccx build`, `ccx inventory`, `ccx ask`, the chat | A [model endpoint](#model-endpoint) |
 | `ccx ask`, `ccx index` | The `knowledge` extra |
-| The chat page | The `service` extra, Redis, Node 22 |
+| The chat page | The `service` extra, Node 22 |
 
 ## Install
 
@@ -98,15 +98,15 @@ docker compose run --rm api index               # build the knowledge base
 On the host instead:
 
 ```bash
-docker compose up -d db redis
+docker compose up -d db
 uv sync --extra dev --extra service --extra integration --extra knowledge
 uv run alembic upgrade head
 uv run --env-file .env ccx index
 npm --prefix web install
 
 uv run --env-file .env ccx api                                   # :8000
-uv run --env-file .env celery -A cloud_conversations.worker.app worker -Q chat -c 1
-uv run --env-file .env celery -A cloud_conversations.worker.app worker -Q runs -c 2
+uv run --env-file .env ccx worker --queue chat
+uv run --env-file .env ccx worker --queue runs
 cd web && VITE_API_BASE_URL=http://localhost:8000 npm run dev    # :5173
 ```
 

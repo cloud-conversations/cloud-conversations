@@ -11,6 +11,7 @@ from fastapi.routing import APIRoute
 import cloud_conversations.db.store as store
 from cloud_conversations.api.app import app
 from cloud_conversations.api.deps import config, session_hash
+from cloud_conversations.schema.runs import RunState
 from tests.conftest import ALICE, BOB
 
 pytestmark = pytest.mark.usefixtures("logged_in", "alice_is_an_admin")
@@ -217,6 +218,43 @@ def test_an_admin_turns_approval_on_and_off(client):
 
     assert (on["require_approval"], off["require_approval"]) == (True, False)
     assert client.get("/admin/settings", headers=ALICE).json()["require_approval"] is False
+
+
+def test_an_admin_pauses_builds_and_releases_and_ends_the_pause(client):
+    on = client.patch("/admin/settings", json={"paused": True}, headers=ALICE).json()
+    off = client.patch("/admin/settings", json={"paused": False}, headers=ALICE).json()
+
+    assert (on["paused"], off["paused"]) == (True, False)
+    assert store.paused() is False
+
+
+def test_the_jobs_list_shows_each_unfinished_build_and_release(
+    client, owner_b, bm_requirements, bm_rubric
+):
+    requirements = bm_requirements.model_copy(update={"site": "FAKE@BM"})
+    did, version = store.create_description(owner_b, "test", requirements, bm_rubric)
+    building = store.create_thread(owner_b, "a bare-metal node").thread_id
+    store.enqueue_job(
+        owner_b, building, "build", {"description_id": str(did), "version": version}
+    )
+    store.claim_job(["build"], 60)
+    run_id = store.create_run(owner_b, did, version, None)
+    store.update_run(owner_b, run_id, state=RunState.provisioning)
+    releasing = store.create_thread(owner_b, "an old node").thread_id
+    store.enqueue_job(owner_b, releasing, "teardown", {"run_id": str(run_id)})
+    store.enqueue_job(owner_b, releasing, "exchange", {})
+    done = store.enqueue_job(owner_b, store.create_thread(owner_b, "done").thread_id, "build", {})
+    store.finish_job(done.job_id)
+
+    listed = client.get("/admin/jobs", headers=ALICE).json()
+
+    assert [
+        (j["kind"], j["state"], j["username"], j["title"], j["site"], j["run_state"])
+        for j in listed
+    ] == [
+        ("build", "running", "bob", "a bare-metal node", "FAKE@BM", "provisioning"),
+        ("teardown", "queued", "bob", "an old node", None, "provisioning"),
+    ]
 
 
 def test_a_limit_for_everyone_is_each_users_default_until_it_is_cleared(client, owner_b):

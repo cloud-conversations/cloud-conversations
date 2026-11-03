@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -27,6 +27,7 @@ from cloud_conversations.api.schemas import (
     FeedbackIn,
     FeedbackOut,
     FeedbackPage,
+    JobInProgressOut,
     JobOut,
     KeyDeleted,
     KeyImport,
@@ -61,13 +62,12 @@ from cloud_conversations.api.schemas import (
     VersionOut,
 )
 from cloud_conversations.db.store import Decision, Description, Message, Run, Thread
-from cloud_conversations.schema.description import (
-    Requirements,
-    ReservationKind,
-    reservation_kind_of,
-)
+from cloud_conversations.schema.description import ReservationKind
 from cloud_conversations.schema.service import NEW_THREAD_TITLE, QUOTAS
-from cloud_conversations.worker import tasks
+
+PAUSED = (
+    "Builds and releases are paused for maintenance. This one goes ahead when maintenance ends."
+)
 
 NEEDS_KEYPAIR = (
     "Before I can build this I need the key you will log in with at {site}. "
@@ -295,6 +295,8 @@ def patch_settings(
 ) -> AdminSettingsOut:
     if patch.require_approval is not None:
         store.set_require_approval(patch.require_approval)
+    if patch.paused is not None:
+        store.set_paused(patch.paused)
     store.set_everyone_limits(**patch.model_dump(include=set(QUOTAS), exclude_unset=True))
     return _settings_out()
 
@@ -303,6 +305,7 @@ def _settings_out() -> AdminSettingsOut:
     service = config().service
     return AdminSettingsOut(
         require_approval=store.require_approval(),
+        paused=store.paused(),
         limits=[
             LimitOut(name=q, default=getattr(service, q), override=v)
             for q, v in store.everyone_limits().items()
@@ -350,6 +353,11 @@ def list_feedback(
 @app.get("/admin/feedback/{feedback_id}", response_model=FeedbackDetailOut)
 def get_feedback(feedback_id: uuid.UUID, _: store.User = Depends(admin)) -> FeedbackDetailOut:
     return FeedbackDetailOut.model_validate(store.feedback_detail(feedback_id))
+
+
+@app.get("/admin/jobs", response_model=list[JobInProgressOut])
+def list_jobs_in_progress(_: store.User = Depends(admin)) -> list[JobInProgressOut]:
+    return [JobInProgressOut.model_validate(j) for j in store.builds_and_releases_in_progress()]
 
 
 @app.get("/admin/system-keys", response_model=list[SystemKeyOut])
@@ -512,7 +520,6 @@ def post_message(
                 title=text[: config().service.thread_title_chars],
                 conn=conn,
             )
-    tasks.run_exchange.delay(str(job.job_id))
     return Posted(
         message=MessageOut.model_validate(message), job=JobOut.model_validate(job)
     )
@@ -573,15 +580,6 @@ def _scope(caller: store.User) -> UserScope:
     return UserScope(caller.user_id, caller.testbed, caller.project())
 
 
-def _latest_start(site: str, requirements: Requirements) -> datetime:
-    """The latest lease start a build can wait for and still finish."""
-    settings = config().for_site(site, reservation_kind_of(requirements.items))
-    after_start = settings.lease_active_s + settings.instance_active_s + settings.ssh_s
-    return datetime.now(timezone.utc) + timedelta(
-        seconds=config().service.job_timeout_s - after_start
-    )
-
-
 def _one_keypair(
     caller: store.User, changes: dict, imported: str, at_sites: str
 ) -> dict[str, None]:
@@ -628,21 +626,17 @@ def _queue_build(
     who = caller.user_id
     thread = store.get_thread(who, thread_id)
     description = store.get_description(who, description_id, version)
+    if replacing is None and store.paused():
+        raise HTTPException(
+            status_code=409,
+            detail="new builds are paused for maintenance. Approve the version again when it ends",
+        )
     site = description.requirements.site
     if not site:
         raise HTTPException(
             status_code=422,
             detail=f"description {description_id} v{version} "
                    "names no site, so nothing can be built from it",
-        )
-    start = description.requirements.start_at
-    latest = _latest_start(site, description.requirements)
-    if start is not None and start > latest:
-        hours = max((latest - datetime.now(timezone.utc)).total_seconds(), 0) / 3600
-        raise HTTPException(
-            status_code=422,
-            detail=f"the lease starts {start:%Y-%m-%d %H:%M} UTC, too late for a build to "
-                   f"finish; ask for a start within {hours:.1f} hours of now",
         )
     if thread.keypair_at(site) is None:
         store.append_message(
@@ -699,7 +693,7 @@ def _queue_build(
             description_version=version,
             conn=conn,
         )
-    tasks.run_build.delay(str(job.job_id))
+    _say_if_paused(who, thread_id)
     return JobOut.model_validate(job)
 
 
@@ -752,7 +746,7 @@ def post_teardown(run_id: uuid.UUID, release: Release, who: str = Depends(owner)
             who, thread.thread_id, "teardown",
             {"run_id": str(run_id), "request_id": str(request_id)}, conn=conn,
         )
-    tasks.run_release.delay(str(job.job_id))
+    _say_if_paused(who, thread.thread_id)
     return JobOut.model_validate(job)
 
 
@@ -769,8 +763,13 @@ def confirm_release(request_id: uuid.UUID, caller: store.User = Depends(user)) -
             who, thread_id, "teardown",
             {"run_id": str(run.run_id), "request_id": str(request_id)}, conn=conn,
         )
-    tasks.run_release.delay(str(job.job_id))
+    _say_if_paused(who, thread_id)
     return JobOut.model_validate(job)
+
+
+def _say_if_paused(who: str, thread_id: uuid.UUID) -> None:
+    if store.paused():
+        store.append_message(thread_id, "assistant", "notice", PAUSED, owner_id=who)
 
 
 @app.post("/releases/{request_id}/decline", status_code=204)

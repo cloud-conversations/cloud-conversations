@@ -97,6 +97,7 @@ def truncate_tables(apply_migrations: None) -> Generator[None, None, None]:
                 knowledge.documents,
                 knowledge.builds,
                 chat.conversations,
+                experiments.planned_resources,
                 experiments.run_resources,
                 experiments.run_events,
                 experiments.runs,
@@ -113,8 +114,9 @@ def truncate_tables(apply_migrations: None) -> Generator[None, None, None]:
             """
         )
         conn.execute(
-            "UPDATE auth.settings SET require_approval = false, max_messages_per_day = NULL, "
-            "max_builds_per_user = NULL, max_active_experiments_per_user = NULL"
+            "UPDATE auth.settings SET require_approval = false, paused = false, "
+            "max_messages_per_day = NULL, max_builds_per_user = NULL, "
+            "max_active_experiments_per_user = NULL"
         )
     yield
 
@@ -191,6 +193,27 @@ def fresh_config(monkeypatch, _test_config_file: Path) -> None:
     bundle.default.cache_clear()
 
 
+class WorkerStopped(Exception):
+    """The worker stopped between the provider's reply and the run's record."""
+
+
+@pytest.fixture()
+def interrupted(monkeypatch):
+    """Run a create that stops the worker after the provider makes the resource."""
+    import cloud_conversations.db.store as store
+
+    def stop(*args, **kwargs):
+        raise WorkerStopped()
+
+    def run(create) -> None:
+        with monkeypatch.context() as m:
+            m.setattr(store, "create_resource_with_event", stop)
+            with pytest.raises(WorkerStopped):
+                create()
+
+    return run
+
+
 @pytest.fixture()
 def client():
     from fastapi.testclient import TestClient
@@ -200,21 +223,13 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture()
-def dispatched(monkeypatch) -> list[tuple[str, str]]:
-    """Every task dispatch, recorded."""
-    from cloud_conversations.worker import tasks
-
-    sent: list[tuple[str, str]] = []
-    for name, task in (
-        ("exchange", tasks.run_exchange),
-        ("build", tasks.run_build),
-        ("teardown", tasks.run_release),
-    ):
-        monkeypatch.setattr(
-            task, "delay", lambda job_id, name=name: sent.append((name, job_id))
-        )
-    return sent
+def queued_jobs() -> list[tuple[str, str]]:
+    """Each queued job's kind and ID, oldest first."""
+    with psycopg.connect(TEST_DB_URL) as conn:
+        rows = conn.execute(
+            "SELECT kind, job_id::text FROM chat.jobs WHERE state = 'queued' ORDER BY created_at"
+        ).fetchall()
+    return [(kind, job_id) for kind, job_id in rows]
 
 
 @pytest.fixture(autouse=True)

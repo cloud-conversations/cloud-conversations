@@ -16,6 +16,7 @@ from cloud_conversations.adapter.errors import (
     ProviderNotFoundError,
     TransientError,
 )
+from cloud_conversations.adapter.planned import made_earlier
 from cloud_conversations.adapter.protocol import (
     AvailabilityWindow,
     Capabilities,
@@ -80,6 +81,7 @@ class FakeInstance:
     node_type: str | None
     run_id: uuid.UUID | None
     security_groups: list[str] = field(default_factory=list)
+    idempotency_key: str | None = None
     # Installed items, each an installer line split on spaces.
     software: list[list[str]] = field(default_factory=list)
     # Each install's status, by its unit.
@@ -125,7 +127,8 @@ class FakeAdapter:
 
         self.leases: dict[str, FakeLease] = {}
         self.instances: dict[str, FakeInstance] = {}
-        self.adhoc_fips: set[str] = set()
+        # The idempotency key of each allocated address.
+        self.adhoc_fips: dict[str, str] = {}
         self.security_groups: dict[str, str] = {}
         self._fip_counter = 0
 
@@ -357,6 +360,13 @@ class FakeAdapter:
             if found is None:
                 raise ProviderNotFoundError("lease", existing.provider_id)
             return self._to_lease(found)
+        made = made_earlier(self, site, "lease", run_id, idempotency_key)
+        if made is not None:
+            store.create_resource_with_event(
+                run_id, made, "lease", site, self.leases[made].end,
+                idempotency_key=idempotency_key,
+            )
+            return self._to_lease(self.leases[made])
 
         if with_floating_ip and not self._reservable_fips_free(site):
             raise NoAddressError("Not enough floating IPs available")
@@ -412,6 +422,19 @@ class FakeAdapter:
                 return x.reserved_host
         return None
 
+    def find_planned(
+        self, site: str, kind: str, run_id: uuid.UUID, idempotency_key: str
+    ) -> str | None:
+        name, key = resource_name(run_id), idempotency_key
+        made = {
+            "lease": [i for i, x in self.leases.items() if x.name == name],
+            "instance": [i for i, x in self.instances.items() if x.idempotency_key == key],
+            "security_group": [i for i, n in self.security_groups.items() if n == name],
+            "floating_ip": [a for a, k in self.adhoc_fips.items() if k == key],
+        }[kind]
+        recorded = store.recorded_provider_ids(run_id, kind)
+        return next((m for m in made if m not in recorded), None)
+
     def delete_lease(self, site: str, lease_id: str) -> None:
         lease = self.leases.get(lease_id)
         if lease is None or lease.site != site:
@@ -447,6 +470,12 @@ class FakeAdapter:
             if found is None:
                 raise ProviderNotFoundError("instance", existing.provider_id)
             return self._to_instance(found)
+        made = made_earlier(self, site, "instance", run_id, idempotency_key)
+        if made is not None:
+            store.create_resource_with_event(
+                run_id, made, "instance", site, expires_at, idempotency_key=idempotency_key
+            )
+            return self._to_instance(self.instances[made])
 
         self._site(site)
 
@@ -491,6 +520,7 @@ class FakeAdapter:
             node_type=node_type,
             run_id=run_id,
             security_groups=list(security_groups or []),
+            idempotency_key=idempotency_key,
         )
         self.instances[instance_id] = inst
 
@@ -527,9 +557,10 @@ class FakeAdapter:
         existing = store.resource_by_idempotency_key(idempotency_key)
         if existing is not None:
             return name
+        made = made_earlier(self, site, "security_group", run_id, idempotency_key)
 
         self._site(site)
-        group_id = str(uuid.uuid4())
+        group_id = made or str(uuid.uuid4())
         self.security_groups[group_id] = name
         store.create_resource_with_event(
             run_id, group_id, "security_group", site, None, idempotency_key=idempotency_key
@@ -557,11 +588,17 @@ class FakeAdapter:
         existing = store.resource_by_idempotency_key(idempotency_key)
         if existing is not None:
             return existing.provider_id
+        made = made_earlier(self, site, "floating_ip", run_id, idempotency_key)
+        if made is not None:
+            store.create_resource_with_event(
+                run_id, made, "floating_ip", site, None, idempotency_key=idempotency_key
+            )
+            return made
 
         if len(self.adhoc_fips) >= self._site(site).floating_ip_quota:
             raise CapacityError(f"No floating IPs left to allocate at {site}")
         address = self._next_ip()
-        self.adhoc_fips.add(address)
+        self.adhoc_fips[address] = idempotency_key
         store.create_resource_with_event(
             run_id, address, "floating_ip", site, None, idempotency_key=idempotency_key
         )
@@ -570,7 +607,7 @@ class FakeAdapter:
     def delete_floating_ip(self, site: str, address: str) -> None:
         if address not in self.adhoc_fips:
             raise ProviderNotFoundError("floating_ip", address)
-        self.adhoc_fips.discard(address)
+        del self.adhoc_fips[address]
         for inst in self.instances.values():
             if inst.floating_ip == address:
                 inst.floating_ip = None
