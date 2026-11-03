@@ -66,23 +66,49 @@ def offer(
     owner_id: str, run: Run, reason: str, detail: dict[str, Any], version: int | None
 ) -> uuid.UUID:
     """Record the agent's proposal to release the run, and post it to the run's chat."""
-    resources = held(run.run_id)
     then = ""
     if version is not None:
         then = f", then build version {version}"
         if detail.get("changes"):
             then += f", which changes {detail['changes']}"
-    shown = f"The experiment agent wants to release {named(resources)}{then}. It says: {reason}"
+    shown = (
+        f"The experiment agent wants to release {named(held(run.run_id))}{then}. "
+        f"It says: {reason}"
+    )
+    action: DecisionAction = "release" if version is None else "release_and_build"
+    return _post(owner_id, run, action, shown, reason, detail, version)
+
+
+def offer_recheck(
+    owner_id: str, run: Run, reason: str, detail: dict[str, Any], version: int
+) -> uuid.UUID:
+    """Record the agent's proposal to check the run's host again, and post it to the run's chat."""
+    shown = (
+        f"The experiment agent wants to check this run's host again with version {version}, "
+        f"which changes {detail['checks']}. It says: {reason}"
+    )
+    return _post(owner_id, run, "resume", shown, reason, detail, version)
+
+
+def _post(
+    owner_id: str,
+    run: Run,
+    action: DecisionAction,
+    shown: str,
+    reason: str,
+    detail: dict[str, Any],
+    version: int | None,
+) -> uuid.UUID:
     chat = store.thread_for_description(owner_id, run.description_id)
     request_id = propose(
-        owner_id, "agent", "release" if version is None else "release_and_build", reason,
-        resources, run_id=run.run_id, thread_id=chat.thread_id if chat else None,
-        description_id=run.description_id, version=version, shown=shown, detail=detail,
+        owner_id, "agent", action, reason, held(run.run_id), run_id=run.run_id,
+        thread_id=chat.thread_id if chat else None, description_id=run.description_id,
+        version=version, shown=shown, detail=detail,
     )
     if chat is not None:
         store.append_message(
             chat.thread_id, "assistant", "release", shown,
-            {"request_id": str(request_id), "version": version},
+            {"request_id": str(request_id), "version": version, "action": action},
             owner_id=owner_id,
             description_id=run.description_id,
             description_version=version or run.description_version,

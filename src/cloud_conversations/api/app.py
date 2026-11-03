@@ -620,13 +620,13 @@ def _queue_build(
     thread_id: uuid.UUID,
     description_id: uuid.UUID,
     version: int,
-    replacing: Decision | None,
+    proposal: Decision | None,
 ) -> JobOut:
-    """Queue a build of the version."""
+    """Queue a build of the version, or of a confirmed agent proposal."""
     who = caller.user_id
     thread = store.get_thread(who, thread_id)
     description = store.get_description(who, description_id, version)
-    if replacing is None and store.paused():
+    if proposal is None and store.paused():
         raise HTTPException(
             status_code=409,
             detail="new builds are paused for maintenance. Approve the version again when it ends",
@@ -653,22 +653,26 @@ def _queue_build(
     payload: dict[str, object] = {"description_id": str(description_id), "version": version}
     said = f"Approved version {version}; building it at {site}."
     with store.transaction() as conn:
-        if replacing is None:
+        if proposal is None:
             payload["request_id"] = str(audit.approved(
                 who, "web", description_id=description_id, version=version,
                 thread_id=thread_id, conn=conn,
             ))
         else:
-            releases.confirm(who, replacing.request_id, "web", conn)
-            payload |= {
-                "replaces_run_id": str(replacing.run_id),
-                "request_id": str(replacing.request_id),
-                "change": replacing.detail["change"],
-            }
-            said = (
-                f"Confirmed releasing {releases.named(replacing.resources)}; building "
-                f"version {version} at {site}."
-            )
+            releases.confirm(who, proposal.request_id, "web", conn)
+            payload["request_id"] = str(proposal.request_id)
+            if proposal.action == "resume":
+                payload["rechecks_run_id"] = str(proposal.run_id)
+                said = f"Confirmed checking the run's host again with version {version}."
+            else:
+                payload |= {
+                    "replaces_run_id": str(proposal.run_id),
+                    "change": proposal.detail["change"],
+                }
+                said = (
+                    f"Confirmed releasing {releases.named(proposal.resources)}; building "
+                    f"version {version} at {site}."
+                )
         used = store.usage(who, conn)
         if used.builds_running >= _limit(caller, "max_builds_per_user"):
             raise HTTPException(
@@ -677,7 +681,7 @@ def _queue_build(
                        "wait for one to finish",
             )
         active = used.active_experiments
-        if replacing is not None and replacing.run_id and store.live_resources(replacing.run_id):
+        if proposal is not None and proposal.run_id and store.live_resources(proposal.run_id):
             active -= 1
         if active >= _limit(caller, "max_active_experiments_per_user"):
             raise HTTPException(

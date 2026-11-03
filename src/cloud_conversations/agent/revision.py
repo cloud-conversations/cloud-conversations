@@ -18,6 +18,7 @@ from cloud_conversations.knowledge.retrieve import KnowledgeBase
 from cloud_conversations.llm.client import Model
 from cloud_conversations.runner import sequential
 from cloud_conversations.schema.description import Requirements, reservation_kind_of
+from cloud_conversations.validator.rubric import Check
 
 
 class Revised(NamedTuple):
@@ -57,7 +58,7 @@ def revise(
 
     outcome, rounds = propose(
         client, catalog, change, settings, prior=desc, knowledge=knowledge,
-        testbed=testbed_of(owner_id), adapter=adapter,
+        testbed=testbed_of(owner_id), adapter=adapter, measured=run.results,
     )
     if not isinstance(outcome, ProposedDescription):
         store.create_conversation(owner_id, change, [t.model_dump(mode="json") for t in rounds])
@@ -66,7 +67,20 @@ def revise(
 
     stored = store_proposal(owner_id, change, rounds, outcome, catalog, desc)
     version = stored.version
-    changed = _changes(desc.requirements, stored.requirements)
+    required = _changes(desc.requirements, stored.requirements)
+    checks = _check_changes(desc.rubric, outcome.rubric)
+    if holding and checks and not required:
+        releases.offer_recheck(
+            owner_id, run, step.reason,
+            {**situation(run, "revise"), "change": change, "checks": checks}, version,
+        )
+        record_refusal(
+            owner_id, run_id,
+            f"version {version} changes only the checks, so it waits for the user to "
+            "approve checking this host again",
+        )
+        return Revised(run_id, catalog, version)
+    changed = ", ".join(part for part in (required, checks) if part)
     if holding:
         releases.offer(
             owner_id, run, step.reason,
@@ -151,6 +165,34 @@ def _changes(approved: Requirements, revised: Requirements) -> str:
     ):
         changed.append("the image")
     return ", ".join(changed)
+
+
+def _check_changes(approved: list[Check], revised: list[Check]) -> str:
+    """The checks that changed."""
+    before = {c.id: c for c in approved}
+    after = {c.id: c for c in revised}
+    changed = [
+        f"{_said(before[i])} becomes {_said(c)}" if i in before else f"adds {_said(c)}"
+        for i, c in after.items()
+        if before.get(i) != c
+    ]
+    changed += [f"drops {_said(c)}" for i, c in before.items() if i not in after]
+    return f"the checks ({'; '.join(changed)})" if changed else ""
+
+
+# Each comparator, as the user reads it.
+_COMPARATORS = {
+    "eq": "is",
+    "gte": "is at least",
+    "prefix": "starts with",
+    "contains": "contains",
+    "version_eq": "is version",
+    "version_gte": "is at least version",
+}
+
+
+def _said(check: Check) -> str:
+    return f"{check.fact()} {_COMPARATORS[check.comparator]} {check.expected!r}"
 
 
 def _ask_approval(
