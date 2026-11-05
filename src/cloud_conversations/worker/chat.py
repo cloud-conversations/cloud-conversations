@@ -10,6 +10,7 @@ from cloud_conversations.adapter import credentials
 from cloud_conversations.adapter.credentials import user_scope
 from cloud_conversations.adapter.errors import AdapterError
 from cloud_conversations.adapter.protocol import Capabilities
+from cloud_conversations.agent import turns
 from cloud_conversations.agent.catalog import Catalog, get_catalog
 from cloud_conversations.agent.contract import DeclineStep, ProposedDescription, Route
 from cloud_conversations.agent.describe import Round, propose, store_proposal
@@ -48,11 +49,9 @@ def exchange(job: Job, config: Config) -> Message:
         return _notice(thread, f"{NO_ENDPOINT} ({exc})")
 
     history = store.read_messages(owner, thread.thread_id)
+    recent = _recent(history, config.service.route_history)
     versions = _versions(thread)
-    step, rounds = route(
-        client, text, _recent(history, config.service.route_history), versions,
-        testbed=testbed_of(owner),
-    )
+    step, rounds = route(client, text, recent, versions, testbed=testbed_of(owner))
     routing = store.create_conversation(
         owner, text, [t.model_dump(mode="json") for t in rounds]
     )
@@ -68,7 +67,7 @@ def exchange(job: Job, config: Config) -> Message:
         return _again(
             thread, thread.description_id, step.version or versions[-1], routing
         )
-    return _describe(client, thread, text, step.route, config, routing)
+    return _describe(client, thread, text, recent, step.route, config, routing)
 
 
 def _holdings(
@@ -159,6 +158,7 @@ def _describe(
     client: Model,
     thread: Thread,
     text: str,
+    recent: list[tuple[str, str]],
     chosen: Route,
     config: Config,
     routing: uuid.UUID,
@@ -179,7 +179,7 @@ def _describe(
     outcome, rounds = propose(
         client,
         catalog,
-        text,
+        text if prior is not None else turns.in_context(text, recent),
         config.for_site(None),
         prior=prior,
         knowledge=usable_knowledge(config.knowledge),
@@ -207,7 +207,7 @@ def _describe(
     described = store.append_message(
         thread.thread_id, "assistant", "description",
         _summary(stored.requirements),
-        {"routing_conversation_id": str(routing)},
+        {"routing_conversation_id": str(routing), "plan": list(outcome.plan)},
         owner_id=thread.owner_id,
         conversation_id=stored.conversation_id,
         description_id=stored.description_id,
@@ -234,7 +234,7 @@ def _refused(
         )
     return _notice(
         thread,
-        f"I could not settle on hardware for that in {rounds} rounds. "
+        f"I could not finish a description in {rounds} rounds. "
         "Try saying it another way, or narrowing it.",
         routing,
         conversation,

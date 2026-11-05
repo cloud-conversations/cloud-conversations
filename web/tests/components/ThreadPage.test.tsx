@@ -122,6 +122,22 @@ describe("a chat", () => {
     expect(screen.getByText("m1.medium")).toBeInTheDocument();
   });
 
+  it("shows the plan above its description", async () => {
+    const plan = "Reach the dashboard over an SSH tunnel.";
+    serve(
+      detail({
+        messages: [
+          { ...described("m1", FIRST, "2026-09-20T10:00:00Z"), payload: { plan: [plan] } },
+        ],
+        versions: [version(FIRST, "m1.large")],
+      }),
+    );
+
+    const shown = await screen.findByText(plan);
+    const card = screen.getByText("m1.large");
+    expect(shown.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("offers the keypair at the site of the latest description", async () => {
     serve(
       detail({
@@ -307,6 +323,30 @@ describe("a chat", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ text: "what do I have running?" }),
+        }),
+      ),
+    );
+  });
+
+  it("sends a suggestion as soon as it is clicked", async () => {
+    const declined: Message = {
+      ...described("m2", FIRST, "2026-09-20T10:01:00Z"),
+      kind: "notice",
+      text: "Creating a router is not supported yet.",
+      payload: { suggestions: ["a medium VM with Ubuntu 26.04 and htop"] },
+    };
+    serve(detail({ messages: [declined] }));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "a medium VM with Ubuntu 26.04 and htop" }),
+    );
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/threads/t1/messages",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ text: "a medium VM with Ubuntu 26.04 and htop" }),
         }),
       ),
     );

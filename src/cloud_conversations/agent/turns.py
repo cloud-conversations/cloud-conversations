@@ -84,7 +84,8 @@ class Turn(Generic[T_co]):
 def faults(exc: ValueError) -> list[str]:
     """What is wrong with a reply, one line for each fault."""
     if isinstance(exc, json.JSONDecodeError) and exc.msg == "Extra data":
-        return ["the reply holds more than one JSON object; send one"]
+        sent = ", ".join(_actions(exc.doc))
+        return [f"the reply holds more than one JSON object ({sent}); send one"]
     if not isinstance(exc, ValidationError):
         return [str(exc)]
     lines = []
@@ -93,6 +94,29 @@ def faults(exc: ValueError) -> list[str]:
         said = error["msg"].removeprefix("Value error, ")
         lines.append(f"{where}: {said}" if where else said)
     return lines
+
+
+def _actions(text: str) -> list[str]:
+    """The action of each JSON object in a reply."""
+    decoder = json.JSONDecoder()
+    actions = []
+    rest = text.strip()
+    while rest:
+        try:
+            value, end = decoder.raw_decode(rest)
+        except json.JSONDecodeError:
+            break
+        actions.append(str(value.get("action")) if isinstance(value, dict) else "?")
+        rest = rest[end:].lstrip()
+    return actions
+
+
+def in_context(message: str, history: list[tuple[str, str]]) -> str:
+    """The message, after the conversation before it."""
+    if not history:
+        return f"The message:\n\n{message}"
+    said = "\n\n".join(f"{who}: {what}" for who, what in history)
+    return f"The conversation so far:\n\n{said}\n\nThe message:\n\n{message}"
 
 
 def retry(reasons: list[str]) -> str:

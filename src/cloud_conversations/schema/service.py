@@ -49,7 +49,7 @@ class Service(BaseModel):
     db_connect_s: float = Field(default=30.0, ge=0)
     # Seconds between tries.
     db_retry_s: float = Field(default=1.0, gt=0)
-    # Thread messages the router sees.
+    # Thread messages the router and the description agent see.
     route_history: int = Field(default=6, ge=0)
     thread_title_chars: int = Field(default=60, ge=1)
     oidc_scope: str = "openid profile email"

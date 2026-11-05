@@ -131,7 +131,7 @@ class Settings(BaseModel):
     )
     llm_timeout_s: float = Field(default=120.0, gt=0)
     llm_max_retries: int = Field(default=2, ge=0)
-    max_rounds: int = Field(default=6, ge=1)
+    max_rounds: int = Field(default=10, ge=1)
     max_candidates_rendered: int = Field(default=40, ge=1)
     max_images_rendered: int = Field(default=10, ge=1)
     max_build_rounds: int = Field(default=4, ge=1)

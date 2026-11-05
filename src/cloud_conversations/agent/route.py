@@ -31,7 +31,7 @@ def route(
     """Decide where one message goes. Returns the route and the transcript."""
     messages = [
         {"role": "system", "content": _system_prompt(testbed, bool(versions))},
-        {"role": "user", "content": _opening(message, history)},
+        {"role": "user", "content": turns.in_context(message, history)},
     ]
 
     def act(step: RouteStep) -> turns.Turn[RouteStep]:
@@ -71,9 +71,3 @@ def _system_prompt(testbed: str, has_description: bool) -> str:
     ]
     return "\n".join(part for part in parts if part)
 
-
-def _opening(message: str, history: list[tuple[str, str]]) -> str:
-    if not history:
-        return f"The message:\n\n{message}"
-    said = "\n\n".join(f"{who}: {what}" for who, what in history)
-    return f"The conversation so far:\n\n{said}\n\nThe message:\n\n{message}"

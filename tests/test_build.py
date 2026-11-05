@@ -182,6 +182,7 @@ def _answer(hours: int = 2) -> str:
 def _decline() -> str:
     return json.dumps({
         "action": "decline",
+        "case": "no_such_hardware",
         "reason": "no image on this testbed reports that release",
         "suggestions": ["ask for Ubuntu 24.04"],
     })

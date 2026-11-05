@@ -69,7 +69,7 @@ llm_max_retries = 2
 
 # Description agent: model calls per description, and hardware and image search results
 # shown to the model.
-max_rounds = 6
+max_rounds = 10
 max_candidates_rendered = 40
 max_images_rendered = 10
 
@@ -243,7 +243,7 @@ port = 8000
 # Seconds before a job is killed.
 job_timeout_s = 5400
 
-# Recent messages in the chat that the router reads.
+# Recent messages in the chat that the router and the description agent read.
 route_history = 6
 
 # Characters of the first message to use as a chat's title.

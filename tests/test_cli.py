@@ -1009,7 +1009,9 @@ def test_verbose_reports_rounds_on_stderr_leaving_stdout_clean(
 def test_verbose_names_a_decline_instead_of_calling_it_unparsed(
     monkeypatch, capsys, owner_env, describe_env
 ):
-    decline = json.dumps({"action": "decline", "reason": "no quantum computer here"})
+    decline = json.dumps({
+        "action": "decline", "case": "no_such_hardware", "reason": "no quantum computer here",
+    })
     with describe_env([decline]):
         code, _ = _main(["describe", "a quantum computer", "--site", _UC, "--verbose"], monkeypatch)
     captured = capsys.readouterr()
@@ -1060,7 +1062,10 @@ def test_describe_links_the_description_to_its_conversation(
 
 
 def _decline_reply(reason: str, suggestions: list[str]) -> str:
-    return json.dumps({"action": "decline", "reason": reason, "suggestions": suggestions})
+    return json.dumps({
+        "action": "decline", "case": "no_such_hardware", "reason": reason,
+        "suggestions": suggestions,
+    })
 
 
 def test_describe_reports_a_refusal_and_stores_it(

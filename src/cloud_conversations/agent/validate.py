@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import re
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from cloud_conversations.adapter.protocol import Flavor
 from cloud_conversations.agent.catalog import Catalog, SiteDoc
 from cloud_conversations.agent.contract import (
     AbandonStep,
     BuildStep,
+    DescriptionDecline,
     ImageSearchStep,
     InspectStep,
     KnowledgeStep,
@@ -19,7 +22,7 @@ from cloud_conversations.agent.contract import (
     RetryStep,
 )
 from cloud_conversations.db.store import Run
-from cloud_conversations.environment.items import GIT_REF, REPOSITORY_URL
+from cloud_conversations.environment.items import GIT_REF, REPOSITORY_URL, git_source
 from cloud_conversations.environment.repo import Repository
 from cloud_conversations.environment.rules import repository_problems, setup_problems
 from cloud_conversations.knowledge.retrieve import KnowledgeBase
@@ -42,6 +45,9 @@ _FILTERS: set[str] = set(NodeQuery.model_fields) - {"intent"}
 
 # Fields that narrow a search to fewer than every node.
 _NARROWING = ("node_type", "flavor", "arch", "gpu", "infiniband", "min_ram_gb")
+
+# A repository address in prose, with or without its scheme.
+_ADDRESS = re.compile(r"(?:https?://)?[\w-]+(?:\.[\w-]+)+/[\w./%~+-]+")
 
 # Narrowing fields allowed for each reserve_by.
 _ANSWERED: dict[ComputeKey, frozenset[str]] = {
@@ -152,6 +158,50 @@ def validate_read_repository(step: ReadRepositoryStep, read: list[Repository]) -
     if any(r.url == step.url and r.ref == (step.ref or "HEAD") for r in read):
         return ["this repository has already been read; use what it returned"]
     return []
+
+
+def validate_decline(step: DescriptionDecline, catalog: Catalog, prompt: str) -> list[str]:
+    """Reasons to refuse a decline."""
+    asked = prompt.lower()
+    if step.case == "retired_site" and not any(s.lower() in asked for s in catalog.retired):
+        return ["the request names no retired site; describe the instance instead"]
+    if step.case == "images_not_visible" and not any(s.images_unseen for s in catalog.sites):
+        return ["every site's images are visible; describe the instance instead"]
+    return []
+
+
+def named_repositories(text: str, items: Sequence[Requirement]) -> set[str]:
+    """The repositories named in the user's text or held by the description."""
+    held = repository_urls([(item.key, item.value) for item in items])
+    return {_address(url) for url in [*_ADDRESS.findall(text), *held]}
+
+
+def repository_urls(items: Sequence[tuple[str, Any]]) -> list[str]:
+    """The URL of each repository cloned, or installed from, by these requirements."""
+    urls = []
+    for key, value in items:
+        source = git_source(key, value)
+        if key == "repository":
+            urls.append(value["url"])
+        elif source is not None:
+            urls.append(source[0])
+    return urls
+
+
+def validate_named(urls: Sequence[str], named: Collection[str]) -> list[str]:
+    """Reasons to refuse a repository the user has not named."""
+    return [
+        f"the user has not given {url}; use only a repository URL the user gives, and put "
+        "software with no package name or repository URL in unsupported"
+        for url in urls
+        if _address(url) not in named
+    ]
+
+
+def _address(url: str) -> str:
+    """A repository URL without its scheme, trailing slash or .git."""
+    bare = url.lower().removeprefix("https://").removeprefix("http://")
+    return bare.rstrip(".,;:)").removesuffix("/").removesuffix(".git")
 
 
 def validate_against_repositories(

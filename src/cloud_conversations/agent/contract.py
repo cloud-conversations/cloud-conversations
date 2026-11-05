@@ -29,6 +29,8 @@ def loads(text: str) -> Any:
 class ProposedDescription(Reply):
     """An answer in the catalog's vocabulary."""
 
+    # How the description meets the request, in a few sentences.
+    plan: list[Note] = Field(default=[], max_length=MAX_NOTES)
     site: str
     start_at: datetime | None = None
     start_source: Source = "default"
@@ -84,8 +86,24 @@ class DeclineStep(Reply):
     suggestions: list[Note] = Field(default=[], max_length=MAX_NOTES)
 
 
+DeclineCase = Literal[
+    "no_such_hardware", "retired_site", "no_hardware", "images_not_visible", "set_aside_rules"
+]
+
+
+class DescriptionDecline(DeclineStep):
+    """A refusal to describe an experiment."""
+
+    case: DeclineCase
+
+
 Step = Annotated[
-    SearchStep | KnowledgeStep | ImageSearchStep | ReadRepositoryStep | AnswerStep | DeclineStep,
+    SearchStep
+    | KnowledgeStep
+    | ImageSearchStep
+    | ReadRepositoryStep
+    | AnswerStep
+    | DescriptionDecline,
     Field(discriminator="action"),
 ]
 
