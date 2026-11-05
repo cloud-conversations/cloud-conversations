@@ -111,7 +111,7 @@ Decline anything that would run longer than a working day.
 | `build_grace_s` | 3600 | seconds late a build may still start, if nothing is reserved for it |
 | `lease_warning_s` | 3600 | seconds of warning a chat gets before its lease ends |
 | `lease_watch_s` | 300 | seconds between an idle worker's lease checks |
-| `route_history` | 6 | recent messages in the chat that the router reads |
+| `route_history` | 6 | recent messages in the chat that the router and the description agent read |
 | `thread_title_chars` | 60 | characters of the first message to use as a chat's title |
 | `oidc_scope` | `openid profile email` | scopes to request from the login provider at login |
 | `oidc_s` | 10 | timeout for each call to the login provider, in seconds |

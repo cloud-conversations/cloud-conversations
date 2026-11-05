@@ -20,6 +20,7 @@ from cloud_conversations.agent.catalog import Catalog, render_image_search
 from cloud_conversations.agent.catalog import render as render_catalog
 from cloud_conversations.agent.contract import (
     DeclineStep,
+    DescriptionDecline,
     ImageSearchStep,
     KnowledgeStep,
     ProposedDescription,
@@ -28,11 +29,15 @@ from cloud_conversations.agent.contract import (
     Step,
 )
 from cloud_conversations.agent.validate import (
+    named_repositories,
+    repository_urls,
     to_requirements,
     validate_against_repositories,
+    validate_decline,
     validate_description,
     validate_image_search,
     validate_knowledge,
+    validate_named,
     validate_query,
     validate_read_repository,
     validate_revision,
@@ -83,6 +88,7 @@ def propose(
     searched_images: list[tuple[str, str]] = []
     found: list[Candidates] = []
     read: list[repo.Repository] = []
+    named = named_repositories(prompt, prior.requirements.items if prior else [])
     lookups = registries.Lookups(
         pypi_url=settings.pypi_url,
         npm_registry_url=settings.npm_registry_url,
@@ -92,8 +98,9 @@ def propose(
     )
 
     def act(step: Step) -> turns.Turn[ProposedDescription | DeclineStep]:
-        if isinstance(step, DeclineStep):
-            return turns.Turn("decline", [], answer=step)
+        if isinstance(step, DescriptionDecline):
+            reasons = validate_decline(step, catalog, prompt)
+            return turns.Turn("decline", reasons, answer=None if reasons else step)
 
         if isinstance(step, KnowledgeStep):
             reasons = validate_knowledge(step.question, knowledge, questions)
@@ -113,7 +120,7 @@ def propose(
             ))
 
         if isinstance(step, ReadRepositoryStep):
-            reasons = validate_read_repository(step, read)
+            reasons = validate_read_repository(step, read) or validate_named([step.url], named)
             if not reasons:
                 try:
                     repository = repo.read(
@@ -152,6 +159,7 @@ def propose(
         if prior is not None and by_user:
             reasons += validate_revision(step.description, prior.requirements)
         software = [(i.key, i.value) for i in step.description.items if i.key in SETUP_KEYS]
+        reasons += validate_named(repository_urls(software), named)
         reasons += lookups.missing(software)
         return turns.Turn("answer", reasons, answer=None if reasons else step.description)
 
@@ -271,6 +279,8 @@ def _opening(
         f"requirements are:\n{prior.requirements.model_dump_json(indent=2)}\n\n"
         f"and its rubric is:\n"
         f"{json.dumps([c.model_dump() for c in prior.rubric], indent=2)}\n\n"
+        f"Its unsupported list is:\n{json.dumps(prior.unsupported, indent=2)}\n\n"
+        f"and its open questions are:\n{json.dumps(prior.open_questions, indent=2)}\n\n"
         f"{host}"
         f"The change asked for is: {prompt}\n\n"
         f"{asked}"

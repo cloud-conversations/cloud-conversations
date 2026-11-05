@@ -99,6 +99,11 @@ export function ThreadPage() {
     posted.mutate(draft.trim(), { onSuccess: () => setDraft("") });
   }
 
+  function sendSuggestion(text: string) {
+    following.current = true;
+    posted.mutate(text);
+  }
+
   /** Resend the user's last message. */
   function askAgain() {
     const asked = [...messages].reverse().find((m) => m.role === "user");
@@ -174,6 +179,7 @@ export function ThreadPage() {
                   approved.mutate({ descriptionId, version: chosen })
                 }
                 onPrefill={setDraft}
+                onSuggestion={sendSuggestion}
                 onAskAgain={askAgain}
               />
             );
@@ -230,6 +236,7 @@ interface SaidProps {
   buildInFlight: boolean;
   onApprove: (descriptionId: string, version: number) => void;
   onPrefill: (text: string) => void;
+  onSuggestion: (text: string) => void;
   onAskAgain: () => void;
 }
 
@@ -259,7 +266,7 @@ function Said(props: SaidProps) {
           message={message}
           threadId={props.threadId}
           keypair={props.keypair}
-          onSuggestion={props.onPrefill}
+          onSuggestion={props.onSuggestion}
           onSaved={
             version
               ? () => props.onApprove(version.description_id, version.version)
@@ -267,6 +274,12 @@ function Said(props: SaidProps) {
           }
         />
       )}
+      {message.kind === "description" &&
+        (message.payload.plan ?? []).map((sentence) => (
+          <p key={sentence} className="text-sm leading-relaxed">
+            {sentence}
+          </p>
+        ))}
       {message.kind === "description" && version && (
         <DescriptionCard
           version={version}

@@ -430,7 +430,8 @@ def _print_description(
         print(f"  {check.id:<6} {check.kind:<14} {check.comparator:<6} "
               f"{check.expected!r}{source}")
 
-    for label, entries in (("unsupported", proposal.unsupported),
+    for label, entries in (("plan", proposal.plan),
+                           ("unsupported", proposal.unsupported),
                            ("open questions", proposal.open_questions)):
         if entries:
             print(f"\n{label}")

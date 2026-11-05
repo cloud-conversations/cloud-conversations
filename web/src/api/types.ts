@@ -168,6 +168,8 @@ export interface Message {
   payload: {
     sources?: string[];
     suggestions?: string[];
+    /** How a description meets the request. */
+    plan?: string[];
     needs?: string;
     tables?: string[];
     again?: boolean;

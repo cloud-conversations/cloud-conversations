@@ -8,11 +8,20 @@ import pytest
 from pydantic import ValidationError
 
 from cloud_conversations.agent.catalog import Catalog, get_catalog
-from cloud_conversations.agent.contract import ProposedDescription, ReadRepositoryStep
+from cloud_conversations.agent.contract import (
+    DeclineCase,
+    DescriptionDecline,
+    ProposedDescription,
+    ReadRepositoryStep,
+)
 from cloud_conversations.agent.validate import (
+    named_repositories,
+    repository_urls,
     to_requirements,
     validate_against_repositories,
+    validate_decline,
     validate_description,
+    validate_named,
     validate_query,
     validate_read_repository,
     validate_revision,
@@ -803,11 +812,53 @@ def test_a_container_with_gpu_access_needs_docker_with_gpu_access(catalog):
 
 
 
+def _declined(case: DeclineCase) -> DescriptionDecline:
+    return DescriptionDecline(action="decline", case=case, reason="not here")
+
+
+def test_a_retired_site_decline_needs_the_request_to_name_one(catalog):
+    retired = catalog.model_copy(update={"retired": {"KVM@TACC": "KVM@TACC has retired."}})
+    assert validate_decline(_declined("retired_site"), retired, "a VM at CHI@TACC") == [
+        "the request names no retired site; describe the instance instead"
+    ]
+
+
+def test_a_retired_site_decline_stands_if_the_request_names_one(catalog):
+    retired = catalog.model_copy(update={"retired": {"KVM@TACC": "KVM@TACC has retired."}})
+    assert validate_decline(_declined("retired_site"), retired, "a VM at Kvm@Tacc") == []
+
+
+def test_an_images_decline_needs_a_site_whose_images_are_not_visible(catalog):
+    seen = [s.model_copy(update={"images_unseen": None}) for s in catalog.sites]
+    visible = catalog.model_copy(update={"sites": seen})
+    assert validate_decline(_declined("images_not_visible"), visible, "Ubuntu 22.04") == [
+        "every site's images are visible; describe the instance instead"
+    ]
+
+
 def test_a_repository_is_read_once():
     read = [Repository(url=REPOSITORY, ref="HEAD", commit="7fd1a60", files={}, facts={})]
     step = ReadRepositoryStep(action="read_repository", url=REPOSITORY)
     assert validate_read_repository(step, read) == [
         "this repository has already been read; use what it returned"
+    ]
+
+
+def test_a_repository_the_user_wrote_without_its_scheme_is_given():
+    named = named_repositories("clone github.com/alice/model.", [])
+    assert validate_named([f"{REPOSITORY}.git"], named) == []
+
+
+def test_a_repository_the_description_holds_is_given():
+    assert validate_named([REPOSITORY], named_repositories("make it larger", [_CLONED])) == []
+
+
+def test_a_package_from_a_repository_the_user_did_not_give_is_refused():
+    items = [("pip_package", "model@git+https://gitlab.com/alice/model@main")]
+    assert validate_named(repository_urls(items), named_repositories("install model", [])) == [
+        "the user has not given https://gitlab.com/alice/model; use only a repository URL "
+        "the user gives, and put software with no package name or repository URL in "
+        "unsupported"
     ]
 
 

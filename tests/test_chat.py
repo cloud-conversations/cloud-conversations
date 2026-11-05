@@ -47,6 +47,7 @@ def _route(chosen: str, **extra: object) -> str:
 def _decline() -> str:
     return json.dumps({
         "action": "decline",
+        "case": "no_such_hardware",
         "reason": "this testbed has no quantum hardware",
         "suggestions": ["a bare-metal node to simulate it on"],
     })
@@ -137,6 +138,16 @@ def test_a_request_for_hardware_writes_the_first_version(monkeypatch, owner_a, t
     assert linked == message.description_id
     written = store.latest_description(owner_a, linked)
     assert written.requirements.value_of("node_type") == "compute_skylake"
+
+
+def test_the_plan_is_posted_with_the_description(monkeypatch, owner_a, thread):
+    plan = ["Reach the dashboard over an SSH tunnel."]
+    message, _ = _exchange(
+        monkeypatch, owner_a, thread, "how should I run a dashboard privately?",
+        [_route("describe"), search_reply(), answer_reply(plan=plan)],
+    )
+
+    assert message.payload["plan"] == plan
 
 
 def _describe_prompt(monkeypatch, owner, thread) -> str:
@@ -304,7 +315,10 @@ def test_a_loop_that_reaches_nothing_says_so(monkeypatch, owner_a, thread):
     )
 
     assert message.kind == "notice"
-    assert "could not settle on hardware" in message.text
+    assert message.text == (
+        "I could not finish a description in 4 rounds. "
+        "Try saying it another way, or narrowing it."
+    )
 
 
 def test_no_model_endpoint_is_reported_on_the_thread(monkeypatch, owner_a, thread):
@@ -362,6 +376,30 @@ def test_the_router_is_shown_what_was_said_before(monkeypatch, owner_a, thread):
     )
 
     assert "an A100 for a day" in model.calls[0][1]["content"]
+
+
+def test_the_description_agent_reads_a_follow_up_against_what_was_said_before(
+    monkeypatch, owner_a, thread
+):
+    store.append_message(
+        thread.thread_id, "user", "user", "a medium VM and a router", owner_id=owner_a
+    )
+    store.append_message(
+        thread.thread_id, "assistant", "notice", "Creating a router is not supported yet.",
+        owner_id=owner_a,
+    )
+    _, model = _exchange(
+        monkeypatch, owner_a, thread, "leave out the router",
+        [_route("describe"), answer_reply()],
+    )
+
+    assert model.calls[1][1]["content"] == (
+        "The conversation so far:\n\n"
+        "user: a medium VM and a router\n\n"
+        "assistant: Creating a router is not supported yet.\n\n"
+        "user: leave out the router\n\n"
+        "The message:\n\nleave out the router"
+    )
 
 
 def test_an_exchange_records_what_the_router_said(monkeypatch, owner_a, thread):

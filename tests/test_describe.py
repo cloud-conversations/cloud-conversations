@@ -92,7 +92,7 @@ def test_a_field_the_description_does_not_have_is_answered_with_the_fields_it_do
     _, rounds, model, _ = _run([search_reply(), json.dumps(wrong), answer_reply()])
 
     assert rounds[1].reasons == [
-        "answer.description: there is no field 'requirements'; the fields are site, "
+        "answer.description: there is no field 'requirements'; the fields are plan, site, "
         "start_at, start_source, duration_hours, duration_source, items, rubric, "
         "unsupported, open_questions"
     ]
@@ -101,10 +101,42 @@ def test_a_field_the_description_does_not_have_is_answered_with_the_fields_it_do
     )
 
 
-def test_a_reply_of_two_objects_is_told_to_send_one():
-    _, rounds, _, _ = _run([search_reply() + "\n" + search_reply(), search_reply(), answer_reply()])
+def test_a_reply_of_two_objects_is_told_which_it_sent():
+    _, rounds, _, _ = _run(
+        [answer_reply() + "\n\n" + _decline(), search_reply(), answer_reply()]
+    )
 
-    assert rounds[0].reasons == ["the reply holds more than one JSON object; send one"]
+    assert rounds[0].reasons == [
+        "the reply holds more than one JSON object (answer, decline); send one"
+    ]
+
+
+def test_a_repository_the_user_did_not_give_is_not_read():
+    read = json.dumps({"action": "read_repository", "url": REPOSITORY})
+    _, rounds, _, _ = _run([read, search_reply(), answer_reply()])
+
+    assert rounds[0].reasons == [
+        f"the user has not given {REPOSITORY}; use only a repository URL the user gives, "
+        "and put software with no package name or repository URL in unsupported"
+    ]
+
+
+def test_a_decline_that_names_no_case_does_not_end_the_loop():
+    unnamed = json.dumps({"action": "decline", "reason": "I don't recognise devstack."})
+    proposal, rounds, _, _ = _run([unnamed, search_reply(), answer_reply()])
+
+    assert rounds[0].reasons == ["decline.case: Field required"]
+    assert isinstance(proposal, ProposedDescription)
+
+
+def test_a_decline_for_a_retired_site_the_request_does_not_name_is_refused():
+    retired = _decline(case="retired_site")
+    proposal, rounds, _, _ = _run([retired, search_reply(), answer_reply()])
+
+    assert rounds[0].reasons == [
+        "the request names no retired site; describe the instance instead"
+    ]
+    assert isinstance(proposal, ProposedDescription)
 
 
 def test_model_prose_is_bounded():
@@ -209,7 +241,7 @@ def test_a_flavor_search_without_a_site_asks_every_site_with_vms():
     search = json.dumps({"action": "search", "query": {
         "reserve_by": "flavor", "min_ram_gb": 8, "duration_hours": 2, "intent": "a VM",
     }})
-    decline = json.dumps({"action": "decline", "reason": "enough"})
+    decline = json.dumps({"action": "decline", "case": "no_hardware", "reason": "enough"})
 
     with serving({"availability": [{"available": 3}]}) as (root, asked):
         adapter = _searching(root, [*SITES, tacc])
@@ -251,6 +283,24 @@ def test_a_revision_re_runs_the_loop_and_carries_the_prior_description():
     assert "make it 4 hours" in opening
     assert "compute_skylake" in opening, "the model sees what it is revising"
     assert [path for path, _ in asked] == ["/nodes/search"], "a revision searches again"
+
+
+def test_a_revision_sees_what_the_last_version_could_not_provide():
+    prior = _prior_version()
+    prior.unsupported = ["Creating a router is not supported yet."]
+    prior.open_questions = ["How long is the VM needed?"]
+    with serving(page(reference_node("compute_skylake"))) as (root, _):
+        model = FakeModel([search_reply(), answer_reply()])
+        propose(
+            model, _catalog(root), "add htop", FOUR_ROUNDS.defaults,
+            prior=prior, testbed="chameleon", adapter=_searching(root),
+        )
+
+    opening = model.calls[0][1]["content"]
+    assert (
+        'Its unsupported list is:\n[\n  "Creating a router is not supported yet."\n]\n\n'
+        'and its open questions are:\n[\n  "How long is the VM needed?"\n]\n\n'
+    ) in opening
 
 
 def test_a_value_a_revision_changes_is_no_longer_a_default():
@@ -327,8 +377,8 @@ def test_time_windows_survive_into_the_search():
 
 
 def _decline(**over) -> str:
-    return json.dumps({"action": "decline", "reason": "this testbed runs computers",
-                       **over})
+    return json.dumps({"action": "decline", "case": "no_such_hardware",
+                       "reason": "this testbed runs computers", **over})
 
 
 def test_a_decline_ends_the_loop_without_a_description():
@@ -478,7 +528,7 @@ def test_the_knowledge_tool_is_offered_only_where_there_is_a_knowledge_base():
 
 def test_an_image_search_shows_the_model_the_matching_images(fake_adapter):
     search = json.dumps({"action": "search_images", "site": "FAKE@BM", "text": "ubuntu"})
-    decline = json.dumps({"action": "decline", "reason": "enough"})
+    decline = json.dumps({"action": "decline", "case": "no_hardware", "reason": "enough"})
     model = FakeModel([search, decline])
 
     _, rounds = propose(
@@ -526,7 +576,7 @@ def _told(files: dict[str, str], archive) -> str:
     read = json.dumps({"action": "read_repository", "url": REPOSITORY})
     with serving(page(reference_node("compute_skylake"))) as (root, _):
         model = FakeModel([read, search_reply(), answer_reply()])
-        propose(model, _catalog(root), "set up alice/model", FOUR_ROUNDS.defaults,
+        propose(model, _catalog(root), f"set up {REPOSITORY}", FOUR_ROUNDS.defaults,
                 testbed="chameleon", adapter=_searching(root))
     return model.calls[1][-1]["content"]
 
