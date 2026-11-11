@@ -223,7 +223,7 @@ export function fetchThread(threadId: string): Promise<ThreadDetail> {
 export function postMessage(threadId: string, text: string): Promise<Posted> {
   return apiFetch<Posted>(`/threads/${encodeURIComponent(threadId)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
   });
 }
 

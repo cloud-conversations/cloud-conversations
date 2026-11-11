@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Source, Version } from "../api/types";
 import { isSoftware, isSoftwareCheck, shown } from "../software";
 import { stamp } from "../time";
@@ -40,6 +41,37 @@ export function DescriptionCard({
   onApprove,
   onAnswer,
 }: Props) {
+  const superseded = version.version < latest;
+  return (
+    <VersionDetails version={version} latest={latest} experiment={experiment} onAnswer={onAnswer}>
+      <div className="px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => onApprove(version.description_id, version.version)}
+          disabled={buildInFlight}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-40 ${
+            superseded ? "bg-grey" : "bg-brand-success"
+          }`}
+        >
+          Approve and build
+        </button>
+        <p className="text-xs text-grey">
+          {buildInFlight
+            ? "a build is already running on this experiment"
+            : `Reserves the hardware above. If the first attempt fails the agent may look
+               at the run, reserve different hardware, or revise the description.`}
+        </p>
+      </div>
+    </VersionDetails>
+  );
+}
+
+export function VersionDetails({
+  version,
+  latest,
+  experiment,
+  onAnswer,
+  children,
+}: Omit<Props, "buildInFlight" | "onApprove"> & { children?: ReactNode }) {
   const { requirements: req } = version;
   const superseded = version.version < latest;
   const image = req.image;
@@ -50,7 +82,7 @@ export function DescriptionCard({
   const softwareChecks = version.rubric.length - hardwareChecks.length;
 
   return (
-    <div className="bg-white border border-grey-light rounded-lg overflow-hidden">
+    <div className="bg-white border border-grey-light rounded-lg overflow-hidden [&>:last-child]:border-b-0">
       <div className="px-4 py-2 bg-grey-lighter border-b border-grey-light flex items-baseline gap-2">
         <h3 className="text-sm font-semibold">
           {experiment ? `Experiment ${experiment}, version ` : "Version "}
@@ -160,23 +192,7 @@ export function DescriptionCard({
         </div>
       )}
 
-      <div className="px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => onApprove(version.description_id, version.version)}
-          disabled={buildInFlight}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-40 ${
-            superseded ? "bg-grey" : "bg-brand-success"
-          }`}
-        >
-          Approve and build
-        </button>
-        <p className="text-xs text-grey">
-          {buildInFlight
-            ? "a build is already running on this experiment"
-            : `Reserves the hardware above. If the first attempt fails the agent may look
-               at the run, reserve different hardware, or revise the description.`}
-        </p>
-      </div>
+      {children}
     </div>
   );
 }

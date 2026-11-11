@@ -22,7 +22,7 @@ from cloud_conversations.agent.contract import (
     RetryStep,
 )
 from cloud_conversations.db.store import Run
-from cloud_conversations.environment.items import GIT_REF, REPOSITORY_URL, git_source
+from cloud_conversations.environment.items import GIT_REF, REPOSITORY_URL, git_source, target
 from cloud_conversations.environment.repo import Repository
 from cloud_conversations.environment.rules import repository_problems, setup_problems
 from cloud_conversations.knowledge.retrieve import KnowledgeBase
@@ -48,6 +48,11 @@ _NARROWING = ("node_type", "flavor", "arch", "gpu", "infiniband", "min_ram_gb")
 
 # A repository address in prose, with or without its scheme.
 _ADDRESS = re.compile(r"(?:https?://)?[\w-]+(?:\.[\w-]+)+/[\w./%~+-]+")
+
+# A note saying something cannot be installed or is not recognised.
+_NOT_INSTALLED = re.compile(r"(cannot|\bnot\b|n['’]t\b).*\b(install|recogni[sz]e)", re.IGNORECASE)
+
+_PACKAGE_KEYS = ("system_package", "pip_package", "npm_package")
 
 # Narrowing fields allowed for each reserve_by.
 _ANSWERED: dict[ComputeKey, frozenset[str]] = {
@@ -321,6 +326,7 @@ def validate_description(
 
     reasons += _rubric(proposed)
     reasons += setup_problems([(i.key, i.value) for i in proposed.items], proposed.rubric)
+    reasons += _installed_and_unsupported(proposed)
 
     if not reasons:
         try:
@@ -419,6 +425,22 @@ def _rubric(proposed: ProposedDescription) -> list[str]:
     elif "ssh_reachable" not in kinds:
         reasons.append("the rubric must contain an ssh_reachable check")
     return reasons
+
+
+def _installed_and_unsupported(proposed: ProposedDescription) -> list[str]:
+    """A reason for each package the answer installs and also says it cannot install."""
+    said = {
+        word.strip(".,;:!?()'\"`’").lower()
+        for note in proposed.unsupported
+        if _NOT_INSTALLED.search(note)
+        for word in note.split()
+    }
+    return [
+        f"{item.key} {item.value} is also in unsupported; install it or say you cannot, "
+        "not both"
+        for item in proposed.items
+        if item.key in _PACKAGE_KEYS and str(target(item.key, item.value)).lower() in said
+    ]
 
 
 def _answer_compute(

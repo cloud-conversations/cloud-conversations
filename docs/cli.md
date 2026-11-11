@@ -6,7 +6,7 @@
 |---|---|
 | `ccx check --site <site>` | Run read-only checks against a site. |
 | `ccx describe "<prompt>"` | Turn a prompt into a description, using a model. |
-| `ccx inventory "<request>"` | List the leases, instances and images your project has. |
+| `ccx inventory "<request>"` | List what your project has at the testbed, such as leases, instances, floating IPs and images. |
 | `ccx ask "<question>"` | Answer a question from the documentation. Leave out the question to ask at a prompt until Ctrl-D. |
 | `ccx index` | Build the knowledge base from the configured sources. |
 | `ccx knowledge` | Show what the live knowledge index holds. |

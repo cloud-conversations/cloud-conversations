@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Message } from "../api/types";
 import { useConfirmRelease, useDeclineRelease } from "../hooks/useThread";
 import { Failed } from "./Failed";
@@ -6,10 +7,11 @@ interface Props {
   message: Message;
   threadId: string;
   decision: "confirmed" | "declined" | undefined;
+  children?: ReactNode;
 }
 
 /** The experiment agent's proposal to release a run, or to check its host again. */
-export function ReleaseMessage({ message, threadId, decision }: Props) {
+export function ReleaseMessage({ message, threadId, decision, children }: Props) {
   const confirmed = useConfirmRelease(threadId);
   const declined = useDeclineRelease(threadId);
   const requestId = message.payload.request_id ?? "";
@@ -20,6 +22,7 @@ export function ReleaseMessage({ message, threadId, decision }: Props) {
   return (
     <div className="bg-brand-danger/5 border border-brand-danger/30 rounded-lg p-4">
       <p className="text-sm leading-relaxed">{message.text}</p>
+      {children && <div className="mt-3">{children}</div>}
       {decision === undefined ? (
         <div className="mt-3 flex gap-2">
           <button

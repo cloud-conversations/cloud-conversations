@@ -15,14 +15,14 @@ from pathlib import Path
 from typing import Any
 
 import cloud_conversations.db.store as store
-from cloud_conversations import audit, crypt, releases
+from cloud_conversations import audit, crypt, holdings, releases
 from cloud_conversations.adapter import credentials
 from cloud_conversations.adapter.credentials import CredentialsError
 from cloud_conversations.adapter.errors import AdapterError
 from cloud_conversations.adapter.fake import FAKE_KEYPAIR, default_fake_sites
 from cloud_conversations.adapter.protocol import (
-    Capabilities,
     Flavor,
+    Kind,
     NodeType,
     SiteDescriptor,
     TestbedAdapter,
@@ -33,7 +33,7 @@ from cloud_conversations.agent.build import Build
 from cloud_conversations.agent.catalog import Catalog, SiteDoc, get_catalog
 from cloud_conversations.agent.contract import DeclineStep, ProposedDescription
 from cloud_conversations.agent.describe import Round, propose, store_proposal
-from cloud_conversations.agent.inventory import Holdings, read_holdings
+from cloud_conversations.agent.inventory import HoldingsStep, read_request
 from cloud_conversations.agent.recover import recover
 from cloud_conversations.agent.revision import build_replacement, keypair_for
 from cloud_conversations.config import (
@@ -525,29 +525,24 @@ def cmd_ask(args: argparse.Namespace) -> int:
 
 
 def cmd_inventory(args: argparse.Namespace) -> int:
-    """List what the caller has at the testbed."""
+    """List what the caller's project has at the testbed."""
     owner = _owner(args)
     config = _config_from(args)
-    site = args.site or next(iter(config.sites_at(testbed_of(owner))), "")
-    adapter = _build_adapter(site, config)
-    logged_in = {args.site} if args.site else set(adapter.sites_with_login())
-    capabilities = Capabilities(
-        sites=[s for s in adapter.capabilities().sites if s.site in logged_in]
-    )
-    if not capabilities.sites:
-        sys.exit("ERROR: no site credentials; run ccx check --site <site>")
+    testbed = testbed_of(owner)
+    adapter = _build_adapter(args.site or next(iter(config.sites_at(testbed)), ""), config)
 
     client = build_client(config.for_site(None), args.model, args.temperature)
-    read, rounds = read_holdings(
-        client, adapter, capabilities, args.request, testbed=testbed_of(owner)
+    now = datetime.now().astimezone()
+    step, rounds = read_request(
+        client, adapter.resource_kinds(), args.request, testbed=testbed, now=now
     )
     conversation_id = store.create_conversation(
         owner, args.request, [r.model_dump(mode="json") for r in rounds]
     )
-    if not isinstance(read, Holdings):
-        if isinstance(read, DeclineStep):
-            print(f"Declined: {read.reason}")
-            for suggestion in read.suggestions:
+    if not isinstance(step, HoldingsStep):
+        if isinstance(step, DeclineStep):
+            print(f"Declined: {step.reason}")
+            for suggestion in step.suggestions:
                 print(f"  - {suggestion}")
         else:
             print(f"Nothing listed after {len(rounds)} rounds.")
@@ -556,11 +551,49 @@ def cmd_inventory(args: argparse.Namespace) -> int:
         print(f"\nconversation_id: {conversation_id}")
         return 1
 
-    for table in read.tables:
-        print(f"\n{table}")
-    print(f"\n{read.summary}")
+    if args.site:
+        step = step.model_copy(update={"sites": [args.site]})
+    held = holdings.read(
+        adapter, config, step, owner_id=owner, project_id=None, thread_id=None,
+        testbed=testbed, now=now,
+    )
+    for kind in held.kinds:
+        rows = [r for r in held.rows if r.kind == kind.name]
+        if rows:
+            print(f"\n{_holdings_table(kind, rows)}")
+    for line in held.left_out:
+        print(f"\n{line}")
+    for site, error in held.unread.items():
+        print(f"\n{site} wasn't read. {error}")
+    print(f"\n{held.summary}")
     print(f"\nconversation_id: {conversation_id}")
     return 0
+
+
+def _holdings_table(kind: Kind, rows: list[holdings.Row]) -> str:
+    header = ["name", "id", "site", "status", "made by", *(c.label.lower() for c in kind.columns)]
+    lines = [
+        [
+            r.name, r.resource_id, r.site, r.status,
+            r.title or ("you" if r.made_by == "you" else ""),
+            *(_cell(r.fields.get(c.name)) for c in kind.columns),
+        ]
+        for r in rows
+    ]
+    widths = [max(len(cell) for cell in column) for column in zip(header, *lines)]
+    aligned = [
+        "  ".join(cell.ljust(w) for cell, w in zip(line, widths)).rstrip()
+        for line in [header, *lines]
+    ]
+    return "\n".join([f"# {kind.label}", *aligned])
+
+
+def _cell(value: str | float | datetime | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return str(value)
 
 
 def _typed_questions(label: str) -> Iterator[str]:
@@ -1660,12 +1693,12 @@ def main() -> None:
 
     p_inv = sub.add_parser(
         "inventory",
-        help="List the leases, instances and images you hold",
+        help="List what your project has at the testbed",
         parents=[common, model_opts],
     )
     p_inv.add_argument("request", help='What to list, as in "my leases and instances"')
     p_inv.add_argument(
-        "--site", default=None, help="One site; the default is every site you hold"
+        "--site", default=None, help="One site; the default is every configured site"
     )
 
     p_index = sub.add_parser(

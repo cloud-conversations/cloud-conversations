@@ -21,11 +21,15 @@ _PROMPTS = {
     ("route", "versions"): {},
     ("route", "rules"): {},
     ("route", "no-description"): {},
-    ("inventory", "instructions"): {},
+    ("inventory", "instructions"): {
+        "kinds": "  leases: ends", "common": "name", "made_by": "you", "now": "Friday 12:00",
+    },
     ("answer", "instructions"): {"primary_section": "P", "supplementary_section": "S"},
 }
 
-_PLACEHOLDER = re.compile(r"\{(testbed|about|now|primary_section|supplementary_section)\}")
+_PLACEHOLDER = re.compile(
+    r"\{(testbed|about|now|kinds|common|made_by|primary_section|supplementary_section)\}"
+)
 
 
 @pytest.mark.parametrize(("agent", "name"), sorted(_PROMPTS))

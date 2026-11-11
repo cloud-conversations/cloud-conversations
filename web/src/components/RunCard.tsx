@@ -73,7 +73,7 @@ export function RunCard({ runId, threadId, releasing, waiting, building }: Props
 
   const holding = run.live_resources.length > 0;
   return (
-    <div className="bg-white border border-grey-light rounded-lg overflow-hidden">
+    <div id={`run-${runId}`} className="bg-white border border-grey-light rounded-lg overflow-hidden">
       <div className="px-4 py-2 bg-grey-lighter border-b border-grey-light flex items-center gap-2">
         <h3 className="text-sm font-semibold">
           Build of version {run.description_version}

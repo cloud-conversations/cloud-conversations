@@ -116,7 +116,7 @@ export function ProfilePage() {
                   <tr key={e.run_id} className="border-t border-grey-light">
                     <td className="py-2 pr-4">
                       {e.thread_id ? (
-                        <Link to={`/threads/${e.thread_id}`} className="text-link">
+                        <Link to={`/threads/${e.thread_id}#run-${e.run_id}`} className="text-link">
                           {e.title}
                         </Link>
                       ) : (

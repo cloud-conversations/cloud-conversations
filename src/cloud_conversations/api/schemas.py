@@ -5,8 +5,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 from cloud_conversations.schema.description import Requirements
 from cloud_conversations.schema.runs import Connection, Failure, RunState
@@ -18,6 +19,16 @@ MAX_PUBLIC_KEY_CHARS = 8000
 
 class NewMessage(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    time_zone: str = "UTC"
+
+    @field_validator("time_zone")
+    @classmethod
+    def _zone_or_utc(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            return "UTC"
+        return value
 
 
 class FeedbackIn(BaseModel):

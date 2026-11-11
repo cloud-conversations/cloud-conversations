@@ -71,6 +71,14 @@ describe("the layout", () => {
     expect(logout).toHaveAttribute("action", "/api/auth/logout");
   });
 
+  it("links to the docs site in a new tab", async () => {
+    await show();
+
+    const docs = screen.getByRole("link", { name: "Docs" });
+    expect(docs).toHaveAttribute("href", "https://docs.cloudconversations.org");
+    expect(docs).toHaveAttribute("target", "_blank");
+  });
+
   it("shows someone who is not an admin no admin link", async () => {
     show({ testbed: "Chameleon", username: "bob", admin: false });
 

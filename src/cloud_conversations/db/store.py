@@ -243,6 +243,19 @@ class Resource:
 
 
 @dataclass
+class OwnedResource:
+    kind: str
+    provider_id: str
+    site: str
+    run_id: uuid.UUID
+    created_at: datetime
+    released_at: datetime | None
+    lease_ends: datetime | None
+    thread_id: uuid.UUID | None
+    title: str | None
+
+
+@dataclass
 class User:
     user_id: str
     username: str
@@ -984,7 +997,7 @@ def record_resource(
         existing = c.execute(
             """
             SELECT provider_id FROM experiments.run_resources
-             WHERE kind = %s AND provider_id = %s
+             WHERE kind = %s AND provider_id = %s AND released_at IS NULL
             """,
             [kind, provider_id],
         ).fetchone()
@@ -2671,6 +2684,35 @@ def active_experiments(owner_id: str) -> list[ActiveExperiment]:
             [owner_id],
         ).fetchall()
     return [ActiveExperiment(**r) for r in rows]
+
+
+def owner_resources(
+    owner_id: str, project_id: str | None, released_since: datetime
+) -> list[OwnedResource]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT res.kind, res.provider_id, res.site, res.run_id, res.created_at,
+                   res.released_at, lease.expires_at AS lease_ends, chat.thread_id, chat.title
+              FROM experiments.runs r
+              JOIN experiments.run_resources res ON res.run_id = r.run_id
+              LEFT JOIN LATERAL (
+                SELECT max(l.expires_at) AS expires_at FROM experiments.run_resources l
+                 WHERE l.run_id = r.run_id AND l.kind = 'lease'
+              ) lease ON true
+              LEFT JOIN LATERAL (
+                SELECT t.thread_id, t.title FROM chat.messages m
+                  JOIN chat.threads t USING (thread_id)
+                 WHERE m.description_id = r.description_id AND t.owner_id = r.owner_id
+                   AND t.deleted_at IS NULL
+                 ORDER BY m.seq LIMIT 1
+              ) chat ON true
+             WHERE r.owner_id = %s AND r.project_id IS NOT DISTINCT FROM %s
+               AND (res.released_at IS NULL OR res.released_at >= %s)
+            """,
+            [owner_id, project_id, released_since],
+        ).fetchall()
+    return [OwnedResource(**r) for r in rows]
 
 
 def announcement() -> Announcement | None:

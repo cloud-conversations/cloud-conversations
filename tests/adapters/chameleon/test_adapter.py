@@ -19,6 +19,7 @@ from cloud_conversations.adapter.chameleon.adapter import (
     Login,
 )
 from cloud_conversations.adapter.errors import (
+    AdapterError,
     AdapterTimeoutError,
     CapacityError,
     FatalError,
@@ -131,6 +132,8 @@ class _StubServer:
         self.status = status
         self.fault = fault
         self.metadata: dict[str, str] = {}
+        self.user_id = "user-9"
+        self.addresses: dict[str, list[dict[str, str]]] = {}
 
 
 class _StubNovaServers:
@@ -221,7 +224,7 @@ class _StubKeypairs:
 
 class _StubImage:
     def __init__(
-        self, uid: str, name: str, created: str = "2026-01-01", supported: bool = True
+        self, uid: str, name: str | None, created: str = "2026-01-01", supported: bool = True
     ) -> None:
         self.id = uid
         self.name = name
@@ -257,8 +260,11 @@ class _StubNeutron:
         self.created: list[dict] = []
         self.groups: list[dict[str, Any]] = []
         self.rules: list[dict] = []
+        self.networks: list[dict[str, Any]] = []
 
-    def list_networks(self, name):
+    def list_networks(self, name=None, project_id=None):
+        if project_id is not None:
+            return {"networks": [n for n in self.networks if n["project_id"] == project_id]}
         return {"networks": [{"id": f"net-{name}", "name": name}]}
 
     def create_floatingip(self, body):
@@ -319,6 +325,9 @@ class _StubAuth(keystoneauth1.plugin.BaseAuthPlugin):
 
     def get_project_id(self, session, **kwargs):
         return self.project_id
+
+    def get_user_id(self, session, **kwargs):
+        return "user-9"
 
 
 _CONFIG = PUBLISHED_CONFIG.model_copy(update={"defaults": FAST.defaults})
@@ -1353,17 +1362,76 @@ def test_ssh_as_a_system_key_the_database_lacks_is_fatal(chameleon, stubs, monke
     )
 
 
-def test_own_images_are_filtered_to_the_callers_project(chameleon, stubs):
-    stubs.glance.images.stored[:] = [
-        _StubImage("img-old", "snapshot-june", "2026-06-01"),
-        _StubImage("img-new", "snapshot-july", "2026-07-01"),
-    ]
+def test_images_are_listed_for_the_callers_project(chameleon, stubs):
+    stubs.glance.images.stored[:] = [_StubImage("img-new", "snapshot-july", "2026-07-01")]
 
-    images = chameleon.list_own_images("CHI@UC")
+    [image] = chameleon.list_resources("CHI@UC", "images")
 
     assert stubs.glance.images.filters == [{"owner": "project-9"}]
-    assert [i.name for i in images] == ["snapshot-july", "snapshot-june"]
-    assert images[0].image_id == "img-new"
+    assert (image.resource_id, image.name) == ("img-new", "snapshot-july")
+
+
+def test_an_image_with_no_name_is_still_listed(chameleon, stubs):
+    stubs.glance.images.stored[:] = [_StubImage("img-1", None)]
+
+    [image] = chameleon.list_resources("CHI@UC", "images")
+
+    assert (image.resource_id, image.name) == ("img-1", "")
+
+
+def test_a_lease_lists_what_it_reserves_and_who_made_it(chameleon, stubs):
+    stubs.blazar.leases = [{
+        **_lease_json(reservations=[{
+            "resource_type": "physical:host", "min": 2,
+            "resource_properties": '["==", "$node_type", "compute_zen3"]',
+        }]),
+        "user_id": "user-9",
+    }]
+
+    [lease] = chameleon.list_resources("CHI@UC", "leases")
+
+    assert (lease.fields["reserved"], lease.mine) == ("2 × compute_zen3", True)
+
+
+def test_an_instance_someone_else_made_is_not_the_callers(chameleon, stubs):
+    server = _StubServer("srv-1", "bob-mpi-0", "ACTIVE")
+    server.user_id = "user-bob"
+    server.addresses = {"sharednet1": [{"addr": "10.0.0.5"}, {"addr": "192.0.2.88"}]}
+    stubs.nova.made.append(server)
+
+    [instance] = chameleon.list_resources("CHI@UC", "instances")
+
+    assert (instance.mine, instance.fields["addresses"]) == (False, "10.0.0.5, 192.0.2.88")
+
+
+def test_a_floating_ip_is_listed_by_its_address(chameleon, stubs):
+    stubs.neutron.fips.append({"id": "fip-1", "floating_ip_address": "192.0.2.10"})
+
+    [address] = chameleon.list_resources("CHI@UC", "floating_ips")
+
+    assert address.resource_id == "192.0.2.10"
+
+
+def test_networks_are_listed_for_the_callers_project_only(chameleon, stubs):
+    stubs.neutron.networks = [
+        {"id": "net-1", "name": "mine", "project_id": "project-9"},
+        {"id": "net-2", "name": "sharednet1", "project_id": "project-admin"},
+    ]
+
+    assert [n.name for n in chameleon.list_resources("CHI@UC", "networks")] == ["mine"]
+
+
+def test_a_listing_the_site_refuses_is_an_adapter_error(chameleon, monkeypatch):
+    from cloud_conversations.adapter.chameleon import adapter as mod
+
+    class Down:
+        def list_floatingips(self):
+            raise RuntimeError("503 Service Unavailable")
+
+    monkeypatch.setattr(mod.chi.network, "neutron", lambda *a, **k: Down())
+
+    with pytest.raises(AdapterError):
+        chameleon.list_resources("CHI@UC", "floating_ips")
 
 
 def test_capabilities_come_from_the_config_and_the_reference_api(tmp_path):
@@ -1455,11 +1523,23 @@ def test_attaching_an_address_puts_it_on_the_instances_port(chameleon, stubs):
 
 
 def test_deleting_an_address_deletes_the_floating_ip_it_names(chameleon, stubs):
-    stubs.neutron.fips.append({"id": "fip-1", "floating_ip_address": "192.0.2.10"})
+    stubs.neutron.fips.append(
+        {"id": "fip-1", "floating_ip_address": "192.0.2.10", "description": "k1"}
+    )
 
-    chameleon.delete_floating_ip("CHI@UC", "192.0.2.10")
+    chameleon.delete_floating_ip("CHI@UC", "192.0.2.10", "k1")
 
     assert stubs.neutron.deleted == ["fip-1"]
+
+
+def test_an_address_with_another_description_is_not_deleted(chameleon, stubs):
+    stubs.neutron.fips.append(
+        {"id": "fip-2", "floating_ip_address": "192.0.2.10", "description": "bob's"}
+    )
+
+    chameleon.delete_floating_ip("CHI@UC", "192.0.2.10", "k1")
+
+    assert stubs.neutron.deleted == []
 
 
 def test_the_keypairs_at_a_site_come_back_by_name(chameleon, stubs):

@@ -62,7 +62,7 @@ from cloud_conversations.api.schemas import (
     VersionOut,
 )
 from cloud_conversations.db.store import Decision, Description, Message, Run, Thread
-from cloud_conversations.schema.description import ReservationKind
+from cloud_conversations.schema.description import KeypairChoice, ReservationKind
 from cloud_conversations.schema.service import NEW_THREAD_TITLE, QUOTAS
 
 PAUSED = (
@@ -461,9 +461,45 @@ def patch_thread(
     if not changes:
         raise HTTPException(status_code=422, detail="name a keypair or a project")
     changes |= _one_keypair(caller, changes, "ssh_key_ref", "site_keypairs")
-    return ThreadSummary.model_validate(
-        store.update_thread(caller.user_id, thread_id, **changes)
-    )
+    before = store.get_thread(caller.user_id, thread_id)
+    with store.transaction() as conn:
+        after = store.update_thread(caller.user_id, thread_id, conn=conn, **changes)
+        for line in _changed(caller, before, after) if before.title != NEW_THREAD_TITLE else []:
+            store.append_message(
+                thread_id, "assistant", "notice", line, owner_id=caller.user_id, conn=conn
+            )
+    return ThreadSummary.model_validate(after)
+
+
+def _changed(caller: store.User, before: store.Thread, after: store.Thread) -> list[str]:
+    lines = []
+    if after.project_id is not None and after.project_id != before.project_id:
+        lines.append(f"Project changed to {_project_name(caller, after.project_id)}.")
+    keypair = after.keypair()
+    if keypair is not None and keypair != before.keypair():
+        lines.append(f"Keypair changed to {_keypair_name(keypair)}.")
+    return lines
+
+
+def _starting_line(caller: store.User, thread: store.Thread) -> str:
+    said = []
+    if thread.project_id:
+        said.append(f"Project: {_project_name(caller, thread.project_id)}.")
+    keypair = thread.keypair()
+    if keypair is not None:
+        said.append(f"Keypair: {_keypair_name(keypair)}.")
+    return " ".join(said)
+
+
+def _project_name(caller: store.User, project_id: str) -> str:
+    nickname = next((p.get("nickname") for p in caller.projects if str(p["id"]) == project_id), "")
+    return f"{nickname} ({project_id})" if nickname else project_id
+
+
+def _keypair_name(keypair: KeypairChoice) -> str:
+    if isinstance(keypair, str):
+        return keypair
+    return ", ".join(f"{k} at {site}" for site, k in keypair.items())
 
 
 @app.delete("/threads/{thread_id}", status_code=204)
@@ -509,8 +545,13 @@ def post_message(
                        f"send another after {after:%Y-%m-%d %H:%M} UTC",
             )
         job = store.enqueue_job(
-            who, thread_id, "exchange", {"text": text}, conn=conn
+            who, thread_id, "exchange", {"text": text, "time_zone": posted.time_zone}, conn=conn
         )
+        starting = _starting_line(caller, thread)
+        if starting and thread.title == NEW_THREAD_TITLE:
+            store.append_message(
+                thread_id, "assistant", "notice", starting, owner_id=who, conn=conn
+            )
         message = store.append_message(
             thread_id, "user", "user", text, owner_id=who, conn=conn
         )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -112,6 +112,33 @@ class ExecResult(BaseModel):
     exit_code: int
 
 
+class Column(BaseModel):
+    name: str
+    label: str
+    type: Literal["text", "time", "number"]
+
+
+class Kind(BaseModel):
+    """A type of resource, such as leases or instances."""
+
+    name: str
+    label: str
+    columns: list[Column]
+    run_kind: str | None = None  # its kind in run_resources, as in "floating_ip"
+    holds_hardware: bool = False
+
+
+class Resource(BaseModel):
+    kind: str
+    site: str
+    resource_id: str
+    name: str
+    status: str
+    created: datetime | None
+    mine: bool | None  # whether the caller made it
+    fields: dict[str, str | float | datetime | None] = {}
+
+
 class TestbedAdapter(Protocol):
 
     def capabilities(self) -> Capabilities:
@@ -154,8 +181,10 @@ class TestbedAdapter(Protocol):
         """Every image the testbed publishes at a site."""
         ...
 
-    def list_own_images(self, site: str) -> list[Image]:
-        """Every image the caller's own project owns at a site."""
+    def resource_kinds(self) -> list[Kind]: ...
+
+    def list_resources(self, site: str, kind: str) -> list[Resource]:
+        """Every resource of a kind in the caller's project at a site."""
         ...
 
     def find_flavor(self, site: str, name: str) -> Flavor | None: ...
@@ -220,7 +249,9 @@ class TestbedAdapter(Protocol):
         """Allocate a public address outside any lease."""
         ...
 
-    def delete_floating_ip(self, site: str, address: str) -> None: ...
+    def delete_floating_ip(self, site: str, address: str, tag: str | None) -> None:
+        """Delete the address if its description is tag."""
+        ...
 
     def attach_floating_ip(self, site: str, instance_id: str, address: str) -> None:
         """Attach a reserved or allocated address to an instance."""

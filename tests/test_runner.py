@@ -504,6 +504,37 @@ def test_the_on_demand_address_is_released_on_teardown(owner_a, bm_requirements,
     assert address not in adapter.adhoc_fips, "the address leaked at the provider"
 
 
+def test_an_address_an_earlier_run_held_is_released_on_teardown(
+    owner_a, bm_requirements, bm_rubric
+):
+    earlier = _no_reservable_fips()
+    first = _provision(owner_a, bm_requirements, bm_rubric, earlier)
+    sequential.teardown(first, earlier)
+    adapter = _no_reservable_fips()
+    run_id = _provision(owner_a, bm_requirements, bm_rubric, adapter)
+    [address] = adapter.adhoc_fips
+    assert address in store.recorded_provider_ids(first, "floating_ip")
+
+    sequential.teardown(run_id, adapter)
+
+    assert adapter.adhoc_fips == {}, "the address leaked at the provider"
+
+
+def test_teardown_leaves_an_address_someone_else_now_holds(owner_a, bm_requirements, bm_rubric):
+    adapter = _no_reservable_fips()
+    run_id = _provision(owner_a, bm_requirements, bm_rubric, adapter)
+    address = next(
+        r.provider_id for r in store.live_resources(run_id) if r.kind == "floating_ip"
+    )
+    adapter.adhoc_fips[address] = "bob's key"
+
+    outcomes = sequential.teardown(run_id, adapter)
+
+    assert all(o.success for o in outcomes)
+    assert store.live_resources(run_id) == []
+    assert adapter.adhoc_fips[address] == "bob's key"
+
+
 def test_a_reserved_address_is_still_preferred(owner_a, bm_requirements, bm_rubric, fake_adapter):
     run_id = _provision(owner_a, bm_requirements, bm_rubric, fake_adapter)
     assert store.get_run(owner_a, run_id).state == RunState.passed

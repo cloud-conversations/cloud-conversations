@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -224,6 +224,47 @@ def test_kind_disambiguates_provider_ids(owner_a, reqs, rubric):
     assert len(store.live_resources(run_id)) == 2
 
 
+def test_an_address_a_released_run_held_is_recorded_for_the_next_run(
+    owner_a, reqs, rubric
+):
+    first = _run(owner_a, reqs, rubric)
+    store.record_resource(first, "192.0.2.10", "floating_ip", "FAKE@BM", None)
+    store.release_resource_with_event(first, "floating_ip", "192.0.2.10", "FAKE@BM")
+    second = _run(owner_a, reqs, rubric)
+
+    assert store.record_resource(
+        second, "192.0.2.10", "floating_ip", "FAKE@BM", None
+    ) == "inserted"
+    assert [r.provider_id for r in store.live_resources(second)] == ["192.0.2.10"]
+
+
+def test_an_address_a_live_run_holds_is_not_recorded_for_another(owner_a, reqs, rubric):
+    store.record_resource(_run(owner_a, reqs, rubric), "192.0.2.10", "floating_ip",
+                          "FAKE@BM", None)
+    second = _run(owner_a, reqs, rubric)
+
+    store.record_resource(second, "192.0.2.10", "floating_ip", "FAKE@BM", None)
+
+    assert store.live_resources(second) == []
+
+
+def test_a_reused_key_on_a_released_address_is_recorded_untagged(owner_a, reqs, rubric):
+    first = _run(owner_a, reqs, rubric)
+    store.record_resource(first, "192.0.2.10", "floating_ip", "FAKE@BM", None)
+    store.release_resource_with_event(first, "floating_ip", "192.0.2.10", "FAKE@BM")
+    second = _run(owner_a, reqs, rubric)
+    store.record_resource(
+        second, "192.0.2.11", "floating_ip", "FAKE@BM", None, idempotency_key="k1"
+    )
+
+    assert store.record_resource(
+        second, "192.0.2.10", "floating_ip", "FAKE@BM", None, idempotency_key="k1"
+    ) == "duplicate_key"
+    assert {r.provider_id for r in store.live_resources(second)} == {
+        "192.0.2.10", "192.0.2.11"
+    }
+
+
 def test_resource_requires_a_real_run(reqs, rubric):
     with pytest.raises(store.NotFoundError):
         store.record_resource(uuid.uuid4(), "orphan", "lease", "FAKE@BM", None)
@@ -389,3 +430,24 @@ def test_runs_for_a_description_come_back_oldest_first(owner_a, owner_b, bm_requ
 
     assert [r.run_id for r in store.runs_for_description(owner_a, did)] == [first, second]
     assert store.runs_for_description(owner_b, did) == [], "scoped to its owner"
+
+
+def test_an_owners_resources_are_only_their_own(owner_a, owner_b, reqs, rubric):
+    store.record_resource(_run(owner_a, reqs, rubric), "l-a", "lease", "FAKE@BM", None)
+    store.record_resource(_run(owner_b, reqs, rubric), "l-b", "lease", "FAKE@BM", None)
+
+    held = store.owner_resources(owner_a, None, datetime.now(timezone.utc))
+
+    assert [r.provider_id for r in held] == ["l-a"]
+
+
+def test_an_owners_resources_include_only_recent_releases(owner_a, reqs, rubric):
+    run_id = _run(owner_a, reqs, rubric)
+    store.record_resource(run_id, "l-1", "lease", "FAKE@BM", None)
+    store.release_resource_with_event(run_id, "lease", "l-1", "FAKE@BM")
+    [released] = store.owner_resources(owner_a, None, datetime(2000, 1, 1, tzinfo=timezone.utc))
+    assert released.released_at is not None
+
+    later = store.owner_resources(owner_a, None, released.released_at + timedelta(seconds=1))
+
+    assert (released.provider_id, later) == ("l-1", [])

@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import cloud_conversations.db.store as store
+from cloud_conversations import holdings
 from cloud_conversations.adapter import credentials
 from cloud_conversations.adapter.credentials import user_scope
 from cloud_conversations.adapter.errors import AdapterError
-from cloud_conversations.adapter.protocol import Capabilities
 from cloud_conversations.agent import turns
 from cloud_conversations.agent.catalog import Catalog, get_catalog
 from cloud_conversations.agent.contract import DeclineStep, ProposedDescription, Route
 from cloud_conversations.agent.describe import Round, propose, store_proposal
-from cloud_conversations.agent.inventory import read_holdings
+from cloud_conversations.agent.inventory import read_request
 from cloud_conversations.agent.route import route
 from cloud_conversations.agent.validate import to_requirements
 from cloud_conversations.config import Config, ConfigError, testbed_of
@@ -33,7 +35,6 @@ NO_KNOWLEDGE = (
 )
 KNOWLEDGE_DISABLED = "This deployment does not answer questions from the documentation."
 NO_SITES = "No {testbed} site is configured, so there is nothing to list."
-NO_LOGINS = "You have no login at any {testbed} site, so there is nothing to list."
 
 
 def exchange(job: Job, config: Config) -> Message:
@@ -62,7 +63,8 @@ def exchange(job: Job, config: Config) -> Message:
     if step.route == "ask":
         return _answer(client, thread, text, history, config, routing)
     if step.route == "inventory":
-        return _holdings(client, thread, text, config, routing)
+        zone = ZoneInfo(str(job.payload.get("time_zone", "UTC")))
+        return _holdings(client, thread, text, config, routing, datetime.now(zone))
     if step.route == "build" and thread.description_id is not None:
         return _again(
             thread, thread.description_id, step.version or versions[-1], routing
@@ -76,46 +78,47 @@ def _holdings(
     text: str,
     config: Config,
     routing: uuid.UUID,
+    now: datetime,
 ) -> Message:
-    """List what the owner has at the sites they have credentials for."""
+    """List what the owner's project has at the testbed. now is in the user's time zone."""
     testbed = testbed_of(thread.owner_id)
     first = next(iter(config.sites_at(testbed)), None)
     if first is None:
         return _notice(thread, NO_SITES.format(testbed=config.label(testbed)), routing)
     try:
-        adapter = credentials.build_adapter(
-            first, config, user_scope(thread.owner_id, thread.project_id)
-        )
+        scope = user_scope(thread.owner_id, thread.project_id)
+        adapter = credentials.build_adapter(first, config, scope)
     except (credentials.CredentialsError, ConfigError, ValueError) as exc:
         return _notice(thread, f"I cannot reach the testbed: {exc}", routing)
 
-    logged_in = set(adapter.sites_with_login())
-    capabilities = Capabilities(
-        sites=[s for s in adapter.capabilities().sites if s.site in logged_in]
-    )
-    if not capabilities.sites:
-        return _notice(thread, NO_LOGINS.format(testbed=config.label(testbed)), routing)
-
-    read, rounds = read_holdings(client, adapter, capabilities, text, testbed=testbed)
+    kinds = adapter.resource_kinds()
+    step, rounds = read_request(client, kinds, text, testbed=testbed, now=now)
     conversation = store.create_conversation(
         thread.owner_id, text, [r.model_dump(mode="json") for r in rounds]
     )
-    if isinstance(read, DeclineStep):
+    if isinstance(step, DeclineStep):
         return _notice(
-            thread, read.reason, routing, conversation,
-            payload={"suggestions": list(read.suggestions)},
+            thread, step.reason, routing, conversation,
+            payload={"suggestions": list(step.suggestions)},
         )
-    if read is None:
+    if step is None:
         return _notice(
             thread,
             f"I could not settle on what to list in {len(rounds)} rounds. Name "
-            "what you want: your leases, your instances, or your images.",
+            f"what you want: {', '.join(k.label.lower() for k in kinds)}.",
             routing,
             conversation,
         )
+    held = holdings.read(
+        adapter, config, step, owner_id=thread.owner_id, project_id=scope.project,
+        thread_id=thread.thread_id, testbed=testbed, now=now,
+    )
     return store.append_message(
-        thread.thread_id, "assistant", "holdings", read.summary,
-        {"tables": read.tables, "routing_conversation_id": str(routing)},
+        thread.thread_id, "assistant", "holdings", held.summary,
+        {
+            **held.model_dump(mode="json", exclude={"summary"}),
+            "routing_conversation_id": str(routing),
+        },
         owner_id=thread.owner_id,
         conversation_id=conversation,
     )

@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import type { Feedback, Message, RunSummary, Version } from "../api/types";
 import { AnswerMessage } from "../components/AnswerMessage";
 import { Composer } from "../components/Composer";
-import { DescriptionCard } from "../components/DescriptionCard";
+import { DescriptionCard, VersionDetails } from "../components/DescriptionCard";
 import { Failed, said } from "../components/Failed";
 import { ChatFeedback, Rate } from "../components/Feedback";
 import { HoldingsMessage } from "../components/HoldingsMessage";
@@ -52,13 +52,25 @@ export function ThreadPage() {
   const scroller = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const growth = useRef<ResizeObserver | null>(null);
+  const named = useRef("");
+  named.current = useLocation().hash.slice(1);
+  // The run card already scrolled to.
+  const reached = useRef("");
 
-  /** Keeps the newest message in view while the chat grows. */
+  /** Scrolls to the run card in the URL, or keeps the newest message in view as the chat grows. */
   const content = useCallback((el: HTMLDivElement | null) => {
     growth.current?.disconnect();
     growth.current = null;
     if (!el) return;
     growth.current = new ResizeObserver(() => {
+      const id = named.current;
+      const card = id && id !== reached.current ? document.getElementById(id) : null;
+      if (card) {
+        card.scrollIntoView();
+        reached.current = id;
+        following.current = false;
+        return;
+      }
       const outer = scroller.current;
       if (outer && following.current) outer.scrollTop = outer.scrollHeight;
     });
@@ -259,7 +271,16 @@ function Said(props: SaidProps) {
       {message.kind === "answer" && <AnswerMessage message={message} />}
       {message.kind === "holdings" && <HoldingsMessage message={message} />}
       {message.kind === "release" && (
-        <ReleaseMessage message={message} threadId={props.threadId} decision={props.decision} />
+        <ReleaseMessage message={message} threadId={props.threadId} decision={props.decision}>
+          {message.payload.version && version && (
+            <VersionDetails
+              version={version}
+              latest={props.latest}
+              experiment={props.experiment}
+              onAnswer={(question) => props.onPrefill(`About "${question}": `)}
+            />
+          )}
+        </ReleaseMessage>
       )}
       {message.kind === "notice" && (
         <NoticeMessage

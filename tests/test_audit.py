@@ -20,10 +20,10 @@ from tests.fakes import FailureConfig, FaultyAdapter
 _READS = {
     "capabilities", "sites_with_login", "published_node_types", "published_flavors",
     "search_hardware", "settings", "list_instances", "get_instance", "get_console_log",
-    "find_image", "list_images", "list_own_images", "find_flavor", "find_keypair",
-    "list_keypairs", "wait_instance_active", "wait_instance_gone", "find_availability",
-    "published_availability", "list_leases", "wait_lease_active", "reserved_host",
-    "find_planned",
+    "find_image", "list_images", "resource_kinds", "list_resources", "find_flavor",
+    "find_keypair", "list_keypairs", "wait_instance_active", "wait_instance_gone",
+    "find_availability", "published_availability", "list_leases", "wait_lease_active",
+    "reserved_host", "find_planned",
 }
 
 
