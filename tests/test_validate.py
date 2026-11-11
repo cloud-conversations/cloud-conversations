@@ -946,6 +946,26 @@ def test_python_s_build_headers_are_a_system_package(catalog):
     assert validate_description(_with_software([headers], [check]), catalog, [_found()]) == []
 
 
+def _devstack(note: str) -> ProposedDescription:
+    package = Requirement(key="system_package", value="devstack", source="stated")
+    check = Check(id="d", kind="package_installed", target="devstack", expected=True,
+                  comparator="eq", from_requirement="system_package")
+    proposed = _with_software([package], [check])
+    return proposed.model_copy(update={"unsupported": [note]})
+
+
+def test_a_package_also_called_uninstallable_is_refused(catalog):
+    proposed = _devstack("Devstack cannot be installed, as it is not a standard package.")
+    assert validate_description(proposed, catalog, [_found()]) == [
+        "system_package devstack is also in unsupported; install it or say you cannot, not both"
+    ]
+
+
+def test_a_package_named_in_another_unsupported_note_is_approved(catalog):
+    proposed = _devstack("Starting devstack on boot is not supported.")
+    assert validate_description(proposed, catalog, [_found()]) == []
+
+
 def test_a_package_a_revision_swapped_in_is_no_longer_a_default():
     prior = Requirements(site=BM_SITE, duration_hours=2, items=[
         *_answer().items,

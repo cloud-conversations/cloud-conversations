@@ -160,6 +160,26 @@ export interface ImportedKey {
   fingerprint: string;
 }
 
+export interface HoldingKind {
+  name: string;
+  label: string;
+  holds_hardware: boolean;
+}
+
+export interface HoldingRow {
+  kind: string;
+  site: string;
+  resource_id: string;
+  name: string;
+  status: string;
+  made_by: "experiment" | "you" | "other" | null;
+  run_id: string | null;
+  thread_id: string | null;
+  title: string | null;
+  lease_ends: string | null;
+  released_at: string | null;
+}
+
 export interface Message {
   message_id: string;
   role: "user" | "assistant";
@@ -171,7 +191,13 @@ export interface Message {
     /** How a description meets the request. */
     plan?: string[];
     needs?: string;
+    /** Preformatted tables. */
     tables?: string[];
+    kinds?: HoldingKind[];
+    rows?: HoldingRow[];
+    left_out?: string[];
+    /** Each site that couldn't be read, with its error. */
+    unread?: Record<string, string>;
     again?: boolean;
     request_id?: string;
     /** The version a proposal replaces the run with. */

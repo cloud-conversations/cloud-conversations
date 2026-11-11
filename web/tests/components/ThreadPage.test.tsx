@@ -68,7 +68,7 @@ function detail(over: Partial<ThreadDetail> = {}): ThreadDetail {
   };
 }
 
-function serve(thread: ThreadDetail, answers: Record<string, unknown> = {}) {
+function serve(thread: ThreadDetail, answers: Record<string, unknown> = {}, at = "/threads/t1") {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string) => {
@@ -85,7 +85,7 @@ function serve(thread: ThreadDetail, answers: Record<string, unknown> = {}) {
     }),
   );
   return render(
-    <MemoryRouter initialEntries={["/threads/t1"]}>
+    <MemoryRouter initialEntries={[at]}>
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
@@ -234,6 +234,28 @@ describe("a chat", () => {
     expect(screen.queryByRole("button", { name: /Release/ })).toBeNull();
   });
 
+  it("shows the version a proposal goes on to use in its card, with no button to build it", async () => {
+    const recheck: Message = {
+      ...PROPOSED,
+      description_version: 2,
+      payload: { request_id: "q1", version: 2, action: "resume" },
+    };
+    serve(detail({ messages: [recheck], versions: [{ ...version(FIRST, "m1.large"), version: 2 }] }));
+
+    const button = await screen.findByRole("button", { name: "Check the host again" });
+    expect(button.parentElement?.parentElement).toContainElement(
+      screen.getByRole("heading", { name: "Version 2" }),
+    );
+    expect(screen.queryByRole("button", { name: "Approve and build" })).toBeNull();
+  });
+
+  it("shows no version in a proposal to release only", async () => {
+    serve(detail({ messages: [PROPOSED], versions: [version(FIRST, "m1.large")] }));
+
+    expect(await screen.findByRole("button", { name: "Release" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Version 1" })).toBeNull();
+  });
+
   it("shows the user's answer in place of the buttons", async () => {
     serve(detail({ messages: [PROPOSED], decisions: { q1: "declined" } }));
 
@@ -322,7 +344,10 @@ describe("a chat", () => {
         "/api/threads/t1/messages",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ text: "what do I have running?" }),
+          body: JSON.stringify({
+            text: "what do I have running?",
+            time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
         }),
       ),
     );
@@ -346,7 +371,10 @@ describe("a chat", () => {
         "/api/threads/t1/messages",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ text: "a medium VM with Ubuntu 26.04 and htop" }),
+          body: JSON.stringify({
+            text: "a medium VM with Ubuntu 26.04 and htop",
+            time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
         }),
       ),
     );
@@ -383,6 +411,31 @@ describe("a chat", () => {
     await screen.findByText("m1.large");
 
     expect(top).toHaveBeenCalledWith(900);
+  });
+
+  it("scrolls to the run a link names once its card is drawn", async () => {
+    let grew: () => void = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(report: ResizeObserverCallback) {
+          grew = () => report([], this as unknown as ResizeObserver);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const reached = vi.fn();
+    Element.prototype.scrollIntoView = function (this: Element) {
+      reached(this.id);
+    };
+    const runs: RunSummary[] = [{ run_id: "r1", created_at: "2026-09-20T10:00:00Z" }];
+    serve(detail({ runs }), {}, "/threads/t1#run-r1");
+    await screen.findByText("Build of version 1");
+
+    grew();
+
+    expect(reached).toHaveBeenCalledWith("run-r1");
   });
 
   it("keeps the newest message in view as the chat grows", async () => {

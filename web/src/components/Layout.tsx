@@ -21,6 +21,7 @@ function Logo() {
   );
 }
 
+const DOCS_URL = "https://docs.cloudconversations.org";
 const BOX = "px-3 py-1 rounded-md border border-grey-light bg-white";
 const LINK = "text-link hover:bg-brand-info/10 hover:border-brand-info/40";
 
@@ -60,6 +61,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="ml-auto flex items-center gap-2 text-sm">
             <span className={`${BOX} text-grey-dark`}>{me.data.username}</span>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${BOX} ${LINK}`}
+            >
+              Docs
+            </a>
             <Link to="/profile" className={`${BOX} ${LINK}`}>
               Profile
             </Link>

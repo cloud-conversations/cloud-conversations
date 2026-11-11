@@ -17,7 +17,9 @@ from psycopg.rows import dict_row
 import cloud_conversations.db.store as store
 from cloud_conversations import releases
 from cloud_conversations.adapter.chameleon.sites import load_capabilities
-from cloud_conversations.adapter.fake import HostFacts
+from cloud_conversations.adapter.errors import TransientError
+from cloud_conversations.adapter.fake import FakeAdapter, HostFacts
+from cloud_conversations.adapter.protocol import Resource
 from cloud_conversations.cli.main import main
 from cloud_conversations.config import load_config
 from cloud_conversations.llm.client import LLMError
@@ -1476,33 +1478,57 @@ def _inventory_cli(monkeypatch, replies: list[str]) -> None:
     )
 
 
-def test_inventory_prints_every_table_and_the_summary(monkeypatch, capsys, owner_env):
-    _inventory_cli(monkeypatch, [json.dumps({
-        "action": "holdings", "holdings": ["images"], "site": "FAKE@BM",
-    })])
+def test_inventory_prints_a_table_per_kind_and_the_summary(monkeypatch, capsys, owner_env):
+    _inventory_cli(monkeypatch, [json.dumps({"action": "holdings", "kinds": ["images"]})])
 
-    code, msg = _main(
-        ["inventory", "my images", "--site", "FAKE@BM"], monkeypatch
-    )
+    code, msg = _main(["inventory", "my images", "--site", "FAKE@BM"], monkeypatch)
     out = capsys.readouterr().out
 
     assert code == 0, msg or out
-    assert "# images" in out
-    assert "my-experiment-snapshot  img-snapshot" in out
-    assert "1 image at FAKE@BM." in out
+    assert "\n# Images\nname                    id            site     status  made by\n" in out
+    assert "\nmy-experiment-snapshot  img-snapshot  FAKE@BM  active\n" in out
+    assert "\n1 image at FAKE@BM.\n" in out
     assert "conversation_id:" in out
+
+
+def test_inventory_prints_a_site_it_could_not_read_with_the_error(
+    monkeypatch, capsys, owner_env
+):
+    _inventory_cli(monkeypatch, [json.dumps({"action": "holdings", "kinds": ["leases"]})])
+
+    def down(self, site, kind):
+        raise TransientError("blazar is down")
+
+    monkeypatch.setattr(FakeAdapter, "list_resources", down)
+
+    _main(["inventory", "my leases", "--site", "FAKE@BM"], monkeypatch)
+
+    assert "\nFAKE@BM wasn't read. blazar is down\n" in capsys.readouterr().out
+
+
+def test_inventory_leaves_made_by_empty_for_someone_elses_resource(
+    monkeypatch, capsys, owner_env
+):
+    _inventory_cli(monkeypatch, [json.dumps({"action": "holdings", "kinds": ["leases"]})])
+    theirs = Resource(
+        kind="leases", site="FAKE@BM", resource_id="lease-9", name="test", status="PENDING",
+        created=None, mine=False,
+    )
+    monkeypatch.setattr(FakeAdapter, "list_resources", lambda self, site, kind: [theirs])
+
+    _main(["inventory", "my leases", "--site", "FAKE@BM"], monkeypatch)
+
+    assert "\ntest  lease-9  FAKE@BM  PENDING\n" in capsys.readouterr().out
 
 
 def test_inventory_narrows_to_the_site_named(monkeypatch, capsys, owner_env):
     _inventory_cli(monkeypatch, [
-        json.dumps({"action": "holdings", "holdings": ["leases"]}),
+        json.dumps({"action": "holdings", "kinds": ["leases"], "sites": ["FAKE@BM"]}),
     ])
 
     _main(["inventory", "my leases", "--site", "FAKE@KVM"], monkeypatch)
-    out = capsys.readouterr().out
 
-    assert "## FAKE@KVM" in out
-    assert "## FAKE@BM" not in out, "--site is the whole world for this call"
+    assert "\nNo leases at FAKE@KVM.\n" in capsys.readouterr().out
 
 
 def test_inventory_reports_what_it_cannot_list(monkeypatch, capsys, owner_env):

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ThreadSidebar } from "../../src/components/ThreadSidebar";
 
@@ -9,7 +9,11 @@ const THREADS = [
   { thread_id: "t1", title: "an A100 for a day", ssh_key_ref: null, created_at: "", updated_at: "" },
 ];
 
-function serve(status = 204, detail = "") {
+function Where() {
+  return <p data-testid="at">{useLocation().pathname}</p>;
+}
+
+function serve(status = 204, detail = "", at = "/") {
   const calls: [string, string][] = [];
   vi.stubGlobal(
     "fetch",
@@ -21,12 +25,20 @@ function serve(status = 204, detail = "") {
       return { ok: true, status: 200, json: async () => THREADS };
     }),
   );
+  const sidebar = (
+    <>
+      <ThreadSidebar width={256} />
+      <Where />
+    </>
+  );
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <ThreadSidebar width={256} />
+        <Routes>
+          <Route path="*" element={sidebar} />
+        </Routes>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -69,6 +81,15 @@ describe("the chat sidebar", () => {
     expect(await dot("idle")).toBeNull();
   });
 
+  it("shades the open chat grey", async () => {
+    serve(204, "", "/threads/t1");
+
+    const open = await screen.findByRole("link", { name: "an A100 for a day" });
+
+    expect(open).toHaveAttribute("aria-current", "page");
+    expect(open.parentElement).toHaveClass("bg-grey-light");
+  });
+
   it("deletes a chat once the confirmation is accepted", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const calls = serve();
@@ -78,6 +99,17 @@ describe("the chat sidebar", () => {
     );
 
     expect(calls).toContainEqual(["DELETE", "/api/threads/t1"]);
+  });
+
+  it("goes home after deleting the open chat", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    serve(204, "", "/threads/t1");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Delete an A100 for a day" }),
+    );
+
+    await waitFor(() => expect(screen.getByTestId("at")).toHaveTextContent(/^\/$/));
   });
 
   it("deletes nothing when the confirmation is refused", async () => {

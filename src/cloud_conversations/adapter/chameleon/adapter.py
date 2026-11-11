@@ -26,6 +26,7 @@ import paramiko
 
 import cloud_conversations.db.store as store
 from cloud_conversations.adapter import system_key
+from cloud_conversations.adapter.chameleon import resources
 from cloud_conversations.adapter.chameleon.catalog import fetch_flavors, fetch_node_types
 from cloud_conversations.adapter.chameleon.search import (
     flavor_availability,
@@ -58,8 +59,10 @@ from cloud_conversations.adapter.protocol import (
     Image,
     Instance,
     Keypair,
+    Kind,
     Lease,
     NodeType,
+    Resource,
     SiteDescriptor,
 )
 from cloud_conversations.config import Config, ConfigError, Settings, resource_name
@@ -124,17 +127,11 @@ def _authorized_key_user_data(key: paramiko.PKey) -> str:
 
 
 def _instance_from_nova(server: Any) -> Instance:
-    raw_fault = getattr(server, "fault", None) or {}
-    fault = None
-    if raw_fault:
-        fault = " ".join(
-            str(raw_fault[k]) for k in ("code", "message", "details") if raw_fault.get(k)
-        ).strip() or None
     return Instance(
         instance_id=server.id,
         state=server.status,
         name=server.name,
-        fault=fault,
+        fault=resources.fault(server),
     )
 
 
@@ -412,25 +409,15 @@ class ChameleonAdapter:
             key=lambda i: i.name,
         )
 
-    def list_own_images(self, site: str) -> list[Image]:
-        """Every image this project owns at a site, newest first."""
-        with self._ctx(site, "list_own_images"):
+    def resource_kinds(self) -> list[Kind]:
+        return resources.KINDS
+
+    def list_resources(self, site: str, kind: str) -> list[Resource]:
+        with self._ctx(site, f"list_{kind}"):
             try:
-                owner = self._session(site).get_project_id()
-                raw = self._retry_read(
-                    site,
-                    "own_image_list",
-                    site,
-                    lambda: chi.image.glance(self._session(site)).images.list(
-                        filters={"owner": owner}
-                    ),
-                )
-                return [
-                    Image(image_id=i.id, name=i.name)
-                    for i in sorted(raw, key=lambda i: i.created_at, reverse=True)
-                ]
+                return resources.read(kind, self._session(site), site)
             except Exception as exc:
-                raise self._map_provider_error(exc, "own_image_list", site) from exc
+                raise self._map_provider_error(exc, kind, site) from exc
 
     def list_flavors(self, site: str) -> list[Flavor]:
         """Every VM flavor at a site, excluding reserved flavors."""
@@ -989,15 +976,15 @@ class ChameleonAdapter:
         )
         return address
 
-    def delete_floating_ip(self, site: str, address: str) -> None:
+    def delete_floating_ip(self, site: str, address: str, tag: str | None) -> None:
         with self._ctx(site, "delete_floating_ip"):
             log.info("deallocating floating ip site=%s address=%s", site, address)
             self._delete(
                 "floating_ip", address,
                 lambda: chi.network.neutron(self._session(site)).delete_floatingip(
-                    self._floating_ip(site, address)["id"]
+                    self._floating_ip(site, address, tag)["id"]
                 ),
-                lambda: self._floating_ip(site, address),
+                lambda: self._floating_ip(site, address, tag),
             )
 
     def wait_instance_gone(self, site: str, instance_id: str) -> None:
@@ -1175,11 +1162,17 @@ class ChameleonAdapter:
 
         return self._retry_read(site, "network", name, find)
 
-    def _floating_ip(self, site: str, address: str) -> dict[str, Any]:
-        """The project's floating IP with this address. Raises ProviderNotFoundError."""
-        listed = chi.network.neutron(self._session(site)).list_floatingips(
-            floating_ip_address=address
-        )["floatingips"]
+    def _floating_ip(
+        self, site: str, address: str, tag: str | None = None
+    ) -> dict[str, Any]:
+        """The project's floating IP with this address and tag. Raises ProviderNotFoundError."""
+        listed = [
+            f
+            for f in chi.network.neutron(self._session(site)).list_floatingips(
+                floating_ip_address=address
+            )["floatingips"]
+            if tag is None or f.get("description") == tag
+        ]
         if not listed:
             raise ProviderNotFoundError("floating_ip", address)
         return dict(listed[0])

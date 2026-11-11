@@ -20,13 +20,16 @@ from cloud_conversations.adapter.planned import made_earlier
 from cloud_conversations.adapter.protocol import (
     AvailabilityWindow,
     Capabilities,
+    Column,
     ExecResult,
     Flavor,
     Image,
     Instance,
     Keypair,
+    Kind,
     Lease,
     NodeType,
+    Resource,
     SiteDescriptor,
 )
 from cloud_conversations.config import Config, KindFacts, Settings, resource_name
@@ -116,6 +119,19 @@ class HostFacts:
                 f"gpu_count={self.gpu_count}",
             ]
         )
+
+
+_KINDS = [
+    Kind(
+        name="leases", label="Leases", run_kind="lease", holds_hardware=True,
+        columns=[Column(name="ends", label="Ends", type="time")],
+    ),
+    Kind(
+        name="instances", label="Instances", run_kind="instance", holds_hardware=True,
+        columns=[Column(name="addresses", label="Addresses", type="text")],
+    ),
+    Kind(name="images", label="Images", columns=[]),
+]
 
 
 class FakeAdapter:
@@ -299,8 +315,37 @@ class FakeAdapter:
     def list_images(self, site: str) -> list[Image]:
         return sorted(self._site(site).images, key=lambda i: i.name)
 
-    def list_own_images(self, site: str) -> list[Image]:
-        return list(self._site(site).own_images)
+    def resource_kinds(self) -> list[Kind]:
+        return _KINDS
+
+    def list_resources(self, site: str, kind: str) -> list[Resource]:
+        s = self._site(site)
+        if kind == "leases":
+            return [
+                Resource(
+                    kind=kind, site=site, resource_id=x.lease_id, name=x.name,
+                    status=x.state, created=x.start, mine=True, fields={"ends": x.end},
+                )
+                for x in self.leases.values()
+                if x.site == site
+            ]
+        if kind == "instances":
+            return [
+                Resource(
+                    kind=kind, site=site, resource_id=i.instance_id, name=i.name,
+                    status=i.state, created=None, mine=True,
+                    fields={"addresses": i.floating_ip},
+                )
+                for i in self.instances.values()
+                if i.site == site and i.state != "DELETED"
+            ]
+        return [
+            Resource(
+                kind=kind, site=site, resource_id=i.image_id, name=i.name,
+                status="active", created=None, mine=None,
+            )
+            for i in s.own_images
+        ]
 
     def list_flavors(self, site: str) -> list[Flavor]:
         return list(self._site(site).descriptor.flavors)
@@ -604,9 +649,11 @@ class FakeAdapter:
         )
         return address
 
-    def delete_floating_ip(self, site: str, address: str) -> None:
+    def delete_floating_ip(self, site: str, address: str, tag: str | None) -> None:
         if address not in self.adhoc_fips:
             raise ProviderNotFoundError("floating_ip", address)
+        if tag is not None and self.adhoc_fips[address] != tag:
+            return
         del self.adhoc_fips[address]
         for inst in self.instances.values():
             if inst.floating_ip == address:

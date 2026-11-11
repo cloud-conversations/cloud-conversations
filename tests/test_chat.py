@@ -413,7 +413,7 @@ def test_an_exchange_records_what_the_router_said(monkeypatch, owner_a, thread):
     assert stored.transcript[0]["action"] == "route"
 
 
-def _holdings_exchange(monkeypatch, owner, thread, text, replies):
+def _holdings_exchange(monkeypatch, owner, thread, text, replies, zone="UTC"):
     """Run one exchange against the fake sites."""
     from cloud_conversations.adapter.fake import FakeAdapter, default_fake_sites
 
@@ -425,7 +425,9 @@ def _holdings_exchange(monkeypatch, owner, thread, text, replies):
         chat.credentials, "build_adapter", lambda site, config, user=None: adapter
     )
 
-    job = store.enqueue_job(owner, thread.thread_id, "exchange", {"text": text})
+    job = store.enqueue_job(
+        owner, thread.thread_id, "exchange", {"text": text, "time_zone": zone}
+    )
     store.append_message(thread.thread_id, "user", "user", text, owner_id=owner)
     return chat.exchange(job, _config()), model
 
@@ -443,74 +445,60 @@ def _fake_lease(lease_id, site):
     )
 
 
-def test_listing_what_the_user_holds_writes_the_tables_it_read(
+def test_listing_what_the_user_holds_writes_the_rows_it_read(
     monkeypatch, owner_a, thread
 ):
     message, _ = _holdings_exchange(
         monkeypatch, owner_a, thread, "list my leases",
         [
             _route("inventory"),
-            json.dumps({
-                "action": "holdings", "holdings": ["leases"], "site": "FAKE@BM",
-            }),
+            json.dumps({"action": "holdings", "kinds": ["leases"], "sites": ["FAKE@BM"]}),
         ],
     )
 
     assert message.kind == "holdings"
     assert message.text == "1 lease at FAKE@BM."
-    assert "mine  lease-1  ACTIVE  1x" in message.payload["tables"][0]
+    assert [r["resource_id"] for r in message.payload["rows"]] == ["lease-1"]
     assert store.unfinished_jobs(owner_a, thread.thread_id)[0].route == "inventory"
 
 
-def test_listing_with_no_site_credentials_says_so_and_spends_no_round(
+def test_a_listing_reads_times_in_the_senders_zone(monkeypatch, owner_a, thread):
+    _, model = _holdings_exchange(
+        monkeypatch, owner_a, thread, "leases ending today",
+        [_route("inventory"), json.dumps({"action": "holdings", "kinds": ["leases"]})],
+        zone="Asia/Tokyo",
+    )
+
+    assert " JST." in model.calls[1][0]["content"]
+
+
+def test_a_chat_with_no_project_joins_runs_in_the_users_project(
+    monkeypatch, owner_a, thread, bm_requirements, bm_rubric
+):
+    did, version = store.create_description(owner_a, "test", bm_requirements, bm_rubric)
+    run_id = store.create_run(owner_a, did, version, "CHI-000001")
+    store.record_resource(run_id, "lease-1", "lease", "FAKE@BM", None)
+
+    message, _ = _holdings_exchange(
+        monkeypatch, owner_a, thread, "list my leases",
+        [_route("inventory"), json.dumps({"action": "holdings", "kinds": ["leases"]})],
+    )
+
+    assert [r["run_id"] for r in message.payload["rows"]] == [str(run_id)]
+
+
+def test_every_configured_site_is_read_with_or_without_a_login(
     monkeypatch, owner_a, thread
 ):
     from cloud_conversations.adapter.fake import FakeAdapter
 
-    model = FakeModel([_route("inventory")])
-    monkeypatch.setattr(chat, "build_client", lambda settings: model)
-    monkeypatch.setattr(
-        chat.credentials,
-        "build_adapter",
-        lambda site, config, user=None: FakeAdapter(sites={}, config=_config()),
+    monkeypatch.setattr(FakeAdapter, "sites_with_login", lambda self: ["FAKE@BM"])
+    message, _ = _holdings_exchange(
+        monkeypatch, owner_a, thread, "list my leases",
+        [_route("inventory"), json.dumps({"action": "holdings", "kinds": ["leases"]})],
     )
 
-    job = store.enqueue_job(
-        owner_a, thread.thread_id, "exchange", {"text": "list my leases"}
-    )
-    message = chat.exchange(job, _config())
-
-    assert message.kind == "notice"
-    assert message.text == "You have no login at any chameleon site, so there is nothing to list."
-    assert len(model.calls) == 1
-
-
-def test_only_the_sites_with_credentials_are_listed(
-    monkeypatch, owner_a, thread
-):
-    from cloud_conversations.adapter.fake import FakeAdapter, default_fake_sites
-
-    model = FakeModel([
-        _route("inventory"),
-        json.dumps({"action": "holdings", "holdings": ["leases"]}),
-    ])
-    sites = default_fake_sites()
-    adapter = FakeAdapter(sites=sites, config=_config())
-    monkeypatch.setattr(adapter, "sites_with_login", lambda: ["FAKE@BM"])
-    monkeypatch.setattr(chat, "build_client", lambda settings: model)
-    monkeypatch.setattr(
-        chat.credentials, "build_adapter", lambda site, config, user=None: adapter
-    )
-
-    job = store.enqueue_job(
-        owner_a, thread.thread_id, "exchange", {"text": "list my leases"}
-    )
-    message = chat.exchange(job, _config())
-
-    assert message.kind == "holdings"
-    assert "FAKE@BM" in model.calls[1][0]["content"]
-    assert "FAKE@KVM" not in model.calls[1][0]["content"]
-    assert "FAKE@KVM" not in message.payload["tables"][0]
+    assert message.text == "1 lease at 2 sites."
 
 
 def test_a_local_users_catalog_says_why_it_lists_no_images(monkeypatch):

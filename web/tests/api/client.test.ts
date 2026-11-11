@@ -58,7 +58,10 @@ describe("the api client", () => {
     const [path, init] = fetchMock.mock.calls[0];
     expect(path).toBe("/api/threads/t1/messages");
     expect(init.method).toBe("POST");
-    expect(init.body).toBe(JSON.stringify({ text: "an A100 for a day" }));
+    expect(JSON.parse(init.body)).toEqual({
+      text: "an A100 for a day",
+      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
     expect(init.headers["Content-Type"]).toBe("application/json");
   });
 

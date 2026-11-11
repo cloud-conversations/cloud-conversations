@@ -64,6 +64,33 @@ def test_posting_a_message_queues_one_exchange(client):
     assert [j["kind"] for j in in_flight] == ["exchange"]
 
 
+def test_the_exchange_reads_times_in_the_senders_zone(client, owner_a):
+    thread_id = _thread(client)
+
+    client.post(
+        f"/threads/{thread_id}/messages",
+        json={"text": "leases ending today", "time_zone": "America/Chicago"},
+        headers=ALICE,
+    )
+
+    [job] = store.unfinished_jobs(owner_a, uuid.UUID(thread_id))
+    assert job.payload["time_zone"] == "America/Chicago"
+
+
+def test_a_message_in_an_unknown_time_zone_reads_times_in_utc(client, owner_a):
+    thread_id = _thread(client)
+
+    posted = client.post(
+        f"/threads/{thread_id}/messages",
+        json={"text": "hello", "time_zone": "Etc/Unknown"},
+        headers=ALICE,
+    )
+
+    assert posted.status_code == 202
+    [job] = store.unfinished_jobs(owner_a, uuid.UUID(thread_id))
+    assert job.payload["time_zone"] == "UTC"
+
+
 def test_a_second_message_is_refused_while_the_first_is_unfinished(client):
     thread_id = _thread(client)
     client.post(f"/threads/{thread_id}/messages", json={"text": "one"}, headers=ALICE)
@@ -77,7 +104,7 @@ def test_a_second_message_is_refused_while_the_first_is_unfinished(client):
     )
     assert len(queued_jobs()) == 1
     messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
-    assert [m["text"] for m in messages] == ["one"]
+    assert [m["text"] for m in messages if m["kind"] == "user"] == ["one"]
 
 
 def test_another_owners_chat_is_not_there(client):
@@ -127,6 +154,69 @@ def test_a_chat_moves_only_to_a_project_the_caller_is_in(client):
     assert refused.status_code == 422
     assert refused.json() == {"detail": "you are not in Chameleon project CHI-999999"}
     assert store.get_thread("chameleon:alice", uuid.UUID(thread_id)).project_id == "CHI-000001"
+
+
+def _said_after_hello(client, *patches: dict) -> list[str]:
+    thread_id = _thread(client)
+    client.post(f"/threads/{thread_id}/messages", json={"text": "hello"}, headers=ALICE)
+    for patch in patches:
+        client.patch(f"/threads/{thread_id}", json=patch, headers=ALICE)
+    messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
+    return [m["text"] for m in messages if m["kind"] == "notice"][1:]
+
+
+def test_moving_a_chat_to_another_project_says_so_in_the_chat(client):
+    store.update_login(
+        "chameleon:alice", "alice",
+        [{"id": "CHI-000001", "nickname": ""}, {"id": "CHI-000002", "nickname": "GPU work"}],
+    )
+
+    said = _said_after_hello(client, {"project_id": "CHI-000002"})
+
+    assert said == ["Project changed to GPU work (CHI-000002)."]
+
+
+def test_a_new_keypair_is_said_once_in_the_chat(client):
+    key = {"ssh_key_ref": "cc-laptop-a1b2c3"}
+
+    assert _said_after_hello(client, key, key) == ["Keypair changed to cc-laptop-a1b2c3."]
+
+
+def test_keypairs_at_sites_are_named_with_their_sites(client):
+    said = _said_after_hello(client, {"site_keypairs": {"CHI@UC": "my-uc-key"}})
+
+    assert said == ["Keypair changed to my-uc-key at CHI@UC."]
+
+
+def test_a_chats_first_message_follows_its_project_and_keypair(client):
+    thread_id = _thread(client)
+    client.patch(f"/threads/{thread_id}", json={"ssh_key_ref": "cc-laptop-a1b2c3"}, headers=ALICE)
+
+    client.post(f"/threads/{thread_id}/messages", json={"text": "hello"}, headers=ALICE)
+
+    messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
+    assert [m["text"] for m in messages] == [
+        "Project: CHI-000001. Keypair: cc-laptop-a1b2c3.", "hello",
+    ]
+
+
+def test_a_later_message_does_not_repeat_the_project(client):
+    thread_id = _thread(client)
+    client.post(f"/threads/{thread_id}/messages", json={"text": "hello"}, headers=ALICE)
+    store.finish_job(uuid.UUID(queued_jobs()[0][1]))
+
+    client.post(f"/threads/{thread_id}/messages", json={"text": "again"}, headers=ALICE)
+
+    messages = client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"]
+    assert [m["text"] for m in messages] == ["Project: CHI-000001.", "hello", "again"]
+
+
+def test_setting_up_a_chat_before_its_first_message_adds_no_line(client):
+    thread_id = _thread(client)
+
+    client.patch(f"/threads/{thread_id}", json={"ssh_key_ref": "cc-laptop-a1b2c3"}, headers=ALICE)
+
+    assert client.get(f"/threads/{thread_id}", headers=ALICE).json()["messages"] == []
 
 
 def test_a_patch_that_names_nothing_is_refused(client):

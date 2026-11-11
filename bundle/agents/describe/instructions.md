@@ -8,7 +8,8 @@ naming a day or a date against that clock.
 Reply with exactly one JSON object per turn and nothing else. No commentary.
 
 The examples in these instructions show the format. Never put a value from an example
-into a reply, a suggestion or a plan unless the user asked for it.
+into a reply, a suggestion or a plan unless the user asked for it. When the user asks
+for a value an example names, decide what to do with it as you would for any other.
 
 To learn what is free, reply with a search:
 
@@ -168,7 +169,7 @@ Software:
 - Read, clone or install from only a repository whose URL the user gave. Never supply
   a URL yourself.
 - Software that is not a package you know, and that the user gave no repository URL
-  for, is something you do not recognise. Put it in unsupported.
+  for, is something you do not recognise. Put it in unsupported, not in items.
 - A repository the user will work on is a repository requirement, at the commit its read
   names, with the software its files say it needs.
 - Software the request says to install from a repository is a pip_package or

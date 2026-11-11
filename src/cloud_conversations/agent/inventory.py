@@ -1,37 +1,67 @@
-"""What a user has at the testbed."""
+"""Turn a message into a listing request."""
 
 from __future__ import annotations
 
+import re
+from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
 from cloud_conversations import bundle
-from cloud_conversations.adapter.errors import AdapterError
-from cloud_conversations.adapter.protocol import Capabilities, TestbedAdapter
+from cloud_conversations.adapter.protocol import Column, Kind
 from cloud_conversations.agent import turns
 from cloud_conversations.agent.contract import DeclineStep
 from cloud_conversations.llm.client import Model
 
-# What can be listed.
-Holding = Literal["leases", "instances", "images"]
+# Fields every kind has.
+COMMON = [
+    Column(name="name", label="Name", type="text"),
+    Column(name="status", label="Status", type="text"),
+    Column(name="created", label="Created", type="time"),
+    Column(name="lease_ends", label="Lease ends", type="time"),
+]
+MADE_BY = ["you", "your_experiments", "this_chat", "others"]
+
+_OPS: dict[str, set[str]] = {
+    "text": {"is", "in", "contains"},
+    "time": {"before", "after"},
+    "number": {"lt", "gt"},
+    "made_by": {"in"},
+}
+_OFFSET = re.compile(r"^([+-]\d+)([hdw])$")
+_UNITS = {"h": "hours", "d": "days", "w": "weeks"}
+
+
+class Condition(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    field: str
+    op: Literal["is", "in", "contains", "before", "after", "lt", "gt"]
+    value: str | float | list[str]
+
+    def values(self) -> list[str]:
+        return self.value if isinstance(self.value, list) else [str(self.value)]
+
+
+class Sort(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    field: str
+    order: Literal["asc", "desc"] = "desc"
 
 
 class HoldingsStep(BaseModel):
-    """The listings one message asks for. A site of None means every site."""
+    """A request to list resources."""
 
     model_config = {"extra": "forbid"}
 
     action: Literal["holdings"]
-    holdings: list[Holding] = Field(min_length=1)
-    site: str | None = None
-
-
-class Holdings(BaseModel):
-    """One table per listing, and a line counting their rows."""
-
-    summary: str
-    tables: list[str]
+    kinds: list[str] = []
+    sites: list[str] = []
+    where: list[Condition] = []
+    sort: Sort | None = None
+    limit: int | None = Field(default=None, ge=1)
 
 
 Listing = Annotated[HoldingsStep | DeclineStep, Field(discriminator="action")]
@@ -39,93 +69,98 @@ Listing = Annotated[HoldingsStep | DeclineStep, Field(discriminator="action")]
 _STEP: TypeAdapter[Listing] = TypeAdapter(Listing)
 
 
-def read_holdings(
-    client: Model,
-    adapter: TestbedAdapter,
-    capabilities: Capabilities,
-    message: str,
-    *,
-    testbed: str,
-) -> tuple[Holdings | DeclineStep | None, list[turns.Round]]:
-    """Read what the message asks for. Returns the tables, a refusal, or None."""
+def parse_time(value: str, now: datetime) -> datetime:
+    """A time with no zone is in now's zone. Raises ValueError if value is not a time."""
+    if value == "now":
+        return now
+    if value == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    offset = _OFFSET.match(value)
+    if offset:
+        return now + timedelta(**{_UNITS[offset.group(2)]: int(offset.group(1))})
+    parsed = datetime.fromisoformat(value)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=now.tzinfo)
+
+
+def field_types(kinds: list[Kind]) -> dict[str, str]:
+    """The fields all of these kinds share, with their types."""
+    own = [{c.name: c.type for c in k.columns} for k in kinds]
+    shared = {n: t for n, t in own[0].items() if all(n in o for o in own)} if own else {}
+    return {c.name: c.type for c in COMMON} | {"made_by": "made_by"} | shared
+
+
+def read_request(
+    client: Model, kinds: list[Kind], message: str, *, testbed: str, now: datetime
+) -> tuple[HoldingsStep | DeclineStep | None, list[turns.Round]]:
+    """Ask the model what to list. Returns the request, a refusal, or None."""
     messages = [
-        {"role": "system", "content": _system_prompt(testbed, capabilities)},
+        {"role": "system", "content": _system_prompt(testbed, kinds, now)},
         {"role": "user", "content": f"The message:\n\n{message}"},
     ]
+    known = [k.name for k in kinds]
 
-    def act(step: HoldingsStep | DeclineStep) -> turns.Turn[Holdings | DeclineStep]:
+    def act(step: HoldingsStep | DeclineStep) -> turns.Turn[HoldingsStep | DeclineStep]:
         if isinstance(step, DeclineStep):
             return turns.Turn("decline", [], answer=step)
-        reasons = _unknown_site(step, capabilities)
-        if reasons:
-            return turns.Turn("holdings", reasons)
-        sites = [step.site] if step.site else [s.site for s in capabilities.sites]
-        read = [_table(holding, adapter, sites) for holding in step.holdings]
-        counted = ", ".join(
-            _counted(holding, total)
-            for holding, (_, total) in zip(step.holdings, read, strict=True)
-        )
-        where = sites[0] if len(sites) == 1 else f"{len(sites)} sites"
-        return turns.Turn("holdings", [], answer=Holdings(
-            summary=f"{counted} at {where}.",
-            tables=[table for table, _ in read],
-        ))
+        unknown = [k for k in step.kinds if k not in known]
+        if unknown:
+            return turns.Turn("holdings", [
+                f"there is no kind {k!r}; the kinds are {', '.join(known)}" for k in unknown
+            ])
+        named = [k for k in kinds if not step.kinds or k.name in step.kinds]
+        reasons = _faults(step, field_types(named), now)
+        return turns.Turn("holdings", reasons, answer=None if reasons else step)
 
     return turns.converse(client, messages, _STEP, 2, act, turns.Round)
 
 
-def _unknown_site(step: HoldingsStep, capabilities: Capabilities) -> list[str]:
-    """Reasons the named site has no credentials."""
-    known = [s.site for s in capabilities.sites]
-    if step.site is None or step.site in known:
-        return []
-    return [
-        f"there are no credentials for {step.site!r}; there are credentials for "
-        f"{', '.join(known) or 'none'}"
-    ]
+def _faults(step: HoldingsStep, types: dict[str, str], now: datetime) -> list[str]:
+    fields = ", ".join(types)
+    reasons = []
+    if step.sort is not None and step.sort.field not in types:
+        reasons.append(f"cannot sort by {step.sort.field!r}; the fields are {fields}")
+    for c in step.where:
+        kind = types.get(c.field)
+        if kind is None:
+            reasons.append(f"{c.field!r} is not a field of these kinds; the fields are {fields}")
+        elif c.op not in _OPS[kind]:
+            ops = ", ".join(sorted(_OPS[kind]))
+            reasons.append(f"{c.op!r} does not apply to {c.field!r}; use {ops}")
+        elif (c.op == "in") != isinstance(c.value, list):
+            reasons.append(f"{c.field!r} {c.op} takes {'a list' if c.op == 'in' else 'one value'}")
+        elif kind == "made_by" and not set(c.values()) <= set(MADE_BY):
+            reasons.append(f"made_by takes {', '.join(MADE_BY)}")
+        elif kind == "number" and not isinstance(c.value, float | int):
+            reasons.append(f"{c.field!r} {c.op} takes a number")
+        elif kind == "text" and isinstance(c.value, float | int):
+            reasons.append(f"{c.field!r} {c.op} takes text")
+        elif kind == "time" and not _names_a_time(c.value, now):
+            reasons.append(
+                f"{c.value!r} is not a time; write an ISO time, now, today, "
+                "or an offset like -7d or +24h"
+            )
+    return reasons
 
 
-def _table(
-    holding: Holding, adapter: TestbedAdapter, sites: list[str]
-) -> tuple[str, int]:
-    """One listing at each site, and how many rows were read."""
-    lines = [f"# {holding}"]
-    total = 0
-    for site in sites:
-        lines.append(f"\n## {site}\n")
-        try:
-            rows = _rows(holding, adapter, site)
-        except AdapterError as exc:
-            lines.append(f"could not be read: {exc}")
-            continue
-        total += len(rows)
-        lines += rows or ["nothing"]
-    return "\n".join(lines), total
+def _names_a_time(value: str | float | list[str], now: datetime) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        parse_time(value, now)
+    except (ValueError, OverflowError):
+        return False
+    return True
 
 
-def _rows(holding: Holding, adapter: TestbedAdapter, site: str) -> list[str]:
-    if holding == "leases":
-        return [
-            f"{x.name}  {x.lease_id}  {x.state}  {x.count}x  "
-            f"{x.start.isoformat()} to {x.end.isoformat()}"
-            for x in adapter.list_leases(site)
-        ]
-    if holding == "instances":
-        return [
-            f"{x.name}  {x.instance_id}  {x.state}"
-            + (f"  fault={x.fault}" if x.fault else "")
-            for x in adapter.list_instances(site)
-        ]
-    return [f"{x.name}  {x.image_id}" for x in adapter.list_own_images(site)]
-
-
-def _counted(holding: Holding, total: int) -> str:
-    if total == 0:
-        return f"no {holding}"
-    return f"{total} {holding[:-1] if total == 1 else holding}"
-
-
-def _system_prompt(testbed: str, capabilities: Capabilities) -> str:
-    named = ", ".join(s.site for s in capabilities.sites) or "none"
-    instructions = bundle.default().prompt(testbed, "inventory", "instructions")
-    return f"{instructions}\nThe sites the user holds credentials for: {named}\n"
+def _system_prompt(testbed: str, kinds: list[Kind], now: datetime) -> str:
+    listed = "\n".join(
+        f"  {k.name}: {', '.join(c.name for c in k.columns) or 'no fields of its own'}"
+        for k in kinds
+    )
+    return bundle.default().prompt(
+        testbed, "inventory", "instructions",
+        kinds=listed,
+        common=", ".join(c.name for c in COMMON),
+        made_by=", ".join(MADE_BY),
+        now=now.strftime("%A %Y-%m-%dT%H:%M %Z"),
+    )

@@ -1,183 +1,138 @@
-"""A user's resources, listed from the sites themselves."""
+"""Turning a message into a listing request."""
 
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from cloud_conversations.adapter.errors import TransientError
-from cloud_conversations.adapter.fake import (
-    FakeAdapter,
-    FakeInstance,
-    FakeLease,
-    default_fake_sites,
-)
-from cloud_conversations.adapter.protocol import Capabilities
+from cloud_conversations.adapter.fake import FakeAdapter, default_fake_sites
 from cloud_conversations.agent.contract import DeclineStep
-from cloud_conversations.agent.inventory import Holdings, read_holdings
+from cloud_conversations.agent.inventory import HoldingsStep, parse_time, read_request
 from tests.conftest import PUBLISHED_CONFIG
 from tests.fakes import FakeModel
 
-BM = "FAKE@BM"
-KVM = "FAKE@KVM"
+NOW = datetime(2026, 11, 6, 14, 2, tzinfo=ZoneInfo("America/Chicago"))
+_KINDS = FakeAdapter(sites=default_fake_sites(), config=PUBLISHED_CONFIG).resource_kinds()
 
 
-def _step(*holdings: str, site: str | None = None) -> str:
-    step: dict[str, object] = {"action": "holdings", "holdings": list(holdings)}
-    if site is not None:
-        step["site"] = site
-    return json.dumps(step)
+def _step(kinds: list[str], sites: list[str] | None = None, **more: object) -> str:
+    return json.dumps({"action": "holdings", "kinds": kinds, "sites": sites or [], **more})
 
 
-def _adapter() -> FakeAdapter:
-    return FakeAdapter(sites=default_fake_sites(), config=PUBLISHED_CONFIG)
+def _corrected(*conditions: dict) -> list[str]:
+    """The reasons sent back for the first reply."""
+    model = FakeModel([_step(["leases"], where=list(conditions)), _step(["leases"])])
+    _, rounds = read_request(model, _KINDS, "my leases", testbed="chameleon", now=NOW)
+    return rounds[0].reasons
 
 
-def _caps(*sites: str) -> Capabilities:
-    return Capabilities(
-        sites=[d for d in _adapter().capabilities().sites if d.site in sites]
+def test_the_sites_a_message_names_are_kept_as_written():
+    model = FakeModel([_step(["leases"], ["TACC"])])
+
+    step, rounds = read_request(
+        model, _KINDS, "my leases at TACC", testbed="chameleon", now=NOW
+    )
+
+    assert step == HoldingsStep(action="holdings", kinds=["leases"], sites=["TACC"])
+    assert len(rounds) == 1
+
+
+def test_the_prompt_lists_the_adapters_kinds():
+    model = FakeModel([_step(["leases"])])
+
+    read_request(model, _KINDS, "my leases", testbed="chameleon", now=NOW)
+
+    assert (
+        "\n  leases: ends\n  instances: addresses\n  images: no fields of its own\n"
+        in model.calls[0][0]["content"]
     )
 
 
-def _lease(lease_id: str, site: str, *, count: int = 1) -> FakeLease:
-    return FakeLease(
-        lease_id=lease_id, name="mine", site=site, state="ACTIVE",
-        start=datetime(2026, 9, 20, 9, tzinfo=timezone.utc),
-        end=datetime(2026, 9, 20, 13, tzinfo=timezone.utc),
-        count=count, node_type="compute_skylake", flavor_id=None,
-        reservation_id="res-1", reserved_flavor_id=None, reserved_fips=[],
-        run_id=None,
-    )
+def test_an_unknown_kind_is_corrected_once_with_the_kinds_there_are():
+    model = FakeModel([_step(["allocations"]), _step(["leases"])])
 
+    step, rounds = read_request(model, _KINDS, "my allocation", testbed="chameleon", now=NOW)
 
-def _instance(instance_id: str, name: str, site: str) -> FakeInstance:
-    return FakeInstance(
-        instance_id=instance_id, name=name, site=site, image_id="img-ubuntu2404",
-        keypair_name="fake-keypair", flavor_id="m1.large", state="ACTIVE",
-        floating_ip=None, node_type=None, run_id=None,
-    )
-
-
-def test_a_lease_is_listed_with_its_window_and_counted():
-    adapter = _adapter()
-    adapter.leases["lease-1"] = _lease("lease-1", BM, count=2)
-
-    read, rounds = read_holdings(
-        FakeModel([_step("leases", site=BM)]), adapter, _caps(BM), "my leases", testbed="chameleon"
-    )
-
-    assert isinstance(read, Holdings)
-    assert read.summary == "1 lease at FAKE@BM."
-    assert "mine  lease-1  ACTIVE  2x" in read.tables[0]
-    assert "2026-09-20T09:00:00+00:00 to 2026-09-20T13:00:00+00:00" in read.tables[0]
-    assert [r.action for r in rounds] == ["holdings"]
-
-
-def test_an_instance_is_listed_by_name():
-    adapter = _adapter()
-    adapter.instances["vm-1"] = _instance("vm-1", "my-vm", KVM)
-
-    read, _ = read_holdings(
-        FakeModel([_step("instances", site=KVM)]), adapter, _caps(KVM), "my vms",
-            testbed="chameleon"
-    )
-
-    assert isinstance(read, Holdings)
-    assert "my-vm  vm-1  ACTIVE" in read.tables[0]
-    assert read.summary == "1 instance at FAKE@KVM."
-
-
-def test_only_the_images_the_project_owns_are_listed():
-    read, _ = read_holdings(
-        FakeModel([_step("images", site=BM)]), _adapter(), _caps(BM), "my images",
-            testbed="chameleon"
-    )
-
-    assert isinstance(read, Holdings)
-    assert "my-experiment-snapshot" in read.tables[0]
-    assert "CC-Ubuntu24.04" not in read.tables[0]
-
-
-def test_two_holdings_are_two_tables_and_one_counted_line():
-    adapter = _adapter()
-    adapter.leases["lease-1"] = _lease("lease-1", BM)
-
-    read, _ = read_holdings(
-        FakeModel([_step("leases", "instances", site=BM)]),
-        adapter, _caps(BM), "my leases and instances", testbed="chameleon"
-    )
-
-    assert isinstance(read, Holdings)
-    assert read.summary == "1 lease, no instances at FAKE@BM."
-    assert [t.splitlines()[0] for t in read.tables] == ["# leases", "# instances"]
-
-
-def test_leaving_the_site_out_covers_every_site():
-    adapter = _adapter()
-    adapter.leases["lease-1"] = _lease("lease-1", KVM)
-
-    read, _ = read_holdings(
-        FakeModel([_step("leases")]), adapter, _caps(BM, KVM), "all my leases", testbed="chameleon"
-    )
-
-    assert isinstance(read, Holdings)
-    assert "## FAKE@BM\n\nnothing" in read.tables[0]
-    assert "## FAKE@KVM\n\nmine  lease-1" in read.tables[0]
-    assert read.summary == "1 lease at 2 sites."
-
-
-def test_a_site_that_cannot_be_read_says_so_and_is_not_counted():
-    class _Broken(FakeAdapter):
-        def list_leases(self, site: str):
-            if site == BM:
-                raise TransientError("blazar is down")
-            return super().list_leases(site)
-
-    adapter = _Broken(sites=default_fake_sites(), config=PUBLISHED_CONFIG)
-    adapter.leases["lease-1"] = _lease("lease-1", KVM)
-
-    read, _ = read_holdings(
-        FakeModel([_step("leases")]), adapter, _caps(BM, KVM), "my leases", testbed="chameleon"
-    )
-
-    assert isinstance(read, Holdings)
-    assert "could not be read: blazar is down" in read.tables[0]
-    assert read.summary == "1 lease at 2 sites.", "the dead site counts nothing"
-
-
-def test_a_site_there_are_no_credentials_for_is_corrected_once():
-    model = FakeModel([_step("leases", site="CHI@TACC"), _step("leases", site=BM)])
-
-    read, rounds = read_holdings(model, _adapter(), _caps(BM), "my leases", testbed="chameleon")
-
-    assert isinstance(read, Holdings)
-    assert [r.action for r in rounds] == ["holdings", "holdings"]
-    assert "no credentials for 'CHI@TACC'" in rounds[0].reasons[0]
+    assert isinstance(step, HoldingsStep)
+    assert rounds[0].reasons == [
+        "there is no kind 'allocations'; the kinds are leases, instances, images"
+    ]
 
 
 def test_two_replies_that_will_not_do_end_with_nothing():
-    model = FakeModel([_step("leases", site="CHI@UC"), _step("leases", site="CHI@UC")])
+    model = FakeModel([_step(["allocations"]), _step(["allocations"])])
 
-    read, rounds = read_holdings(model, _adapter(), _caps(BM), "my leases", testbed="chameleon")
+    step, rounds = read_request(model, _KINDS, "my allocation", testbed="chameleon", now=NOW)
 
-    assert read is None
-    assert len(rounds) == 2, "one correction, then it gives up"
-
-
-def _decline(reason: str, *suggestions: str) -> str:
-    return json.dumps({
-        "action": "decline", "reason": reason, "suggestions": list(suggestions),
-    })
+    assert (step, len(rounds)) == (None, 2)
 
 
 def test_something_it_cannot_list_is_refused_rather_than_guessed_at():
-    model = FakeModel([_decline("I cannot read allocations here", "your leases")])
+    model = FakeModel([json.dumps({
+        "action": "decline", "reason": "I cannot read allocations here",
+        "suggestions": ["your leases"],
+    })])
 
-    read, rounds = read_holdings(
-        model, _adapter(), _caps(BM), "how much of my allocation is left?", testbed="chameleon"
+    step, _ = read_request(
+        model, _KINDS, "how much of my allocation is left?", testbed="chameleon", now=NOW
     )
 
-    assert isinstance(read, DeclineStep)
-    assert read.reason == "I cannot read allocations here"
-    assert read.suggestions == ["your leases"]
-    assert [r.action for r in rounds] == ["decline"]
+    assert isinstance(step, DeclineStep)
+    assert (step.reason, step.suggestions) == ("I cannot read allocations here", ["your leases"])
+
+
+def test_the_prompt_says_what_time_it_is_for_the_user():
+    model = FakeModel([_step(["leases"])])
+
+    read_request(model, _KINDS, "my leases", testbed="chameleon", now=NOW)
+
+    prompt = model.calls[0][0]["content"]
+    assert "The user's time now is Friday 2026-11-06T14:02 CST." in prompt
+
+
+def test_a_condition_on_a_field_the_kind_lacks_is_corrected():
+    assert _corrected({"field": "size_gb", "op": "gt", "value": 10}) == [
+        "'size_gb' is not a field of these kinds; the fields are "
+        "name, status, created, lease_ends, made_by, ends"
+    ]
+
+
+def test_an_op_that_does_not_fit_the_field_is_corrected():
+    assert _corrected({"field": "ends", "op": "contains", "value": "Monday"}) == [
+        "'contains' does not apply to 'ends'; use after, before"
+    ]
+
+
+def test_a_time_it_cannot_read_is_corrected():
+    assert _corrected({"field": "ends", "op": "before", "value": "next Monday"}) == [
+        "'next Monday' is not a time; write an ISO time, now, today, "
+        "or an offset like -7d or +24h"
+    ]
+
+
+def test_a_number_on_a_text_field_is_corrected():
+    assert _corrected({"field": "name", "op": "contains", "value": 2}) == [
+        "'name' contains takes text"
+    ]
+
+
+def test_an_offset_too_far_out_is_corrected():
+    assert _corrected({"field": "ends", "op": "before", "value": "+999999999d"}) == [
+        "'+999999999d' is not a time; write an ISO time, now, today, "
+        "or an offset like -7d or +24h"
+    ]
+
+
+def test_made_by_takes_only_its_own_values():
+    assert _corrected({"field": "made_by", "op": "in", "value": ["bob"]}) == [
+        "made_by takes you, your_experiments, this_chat, others"
+    ]
+
+
+def test_a_time_is_read_in_the_users_zone():
+    assert parse_time("2026-11-09T09:00", NOW) == datetime(
+        2026, 11, 9, 9, tzinfo=ZoneInfo("America/Chicago")
+    )
+    week_ago = datetime(2026, 10, 30, 14, 2, tzinfo=ZoneInfo("America/Chicago"))
+    assert parse_time("-7d", NOW) == week_ago

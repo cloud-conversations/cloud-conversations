@@ -15,3 +15,7 @@ export function stamp(iso: string): string {
     timeZoneName: "short",
   });
 }
+
+export function day(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}

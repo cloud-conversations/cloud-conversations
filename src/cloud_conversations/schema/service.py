@@ -51,6 +51,12 @@ class Service(BaseModel):
     db_retry_s: float = Field(default=1.0, gt=0)
     # Thread messages the router and the description agent see.
     route_history: int = Field(default=6, ge=0)
+    # Seconds to wait for a site to list one kind.
+    holdings_read_s: float = Field(default=30.0, gt=0)
+    # Most rows one listing keeps.
+    holdings_max_rows: int = Field(default=200, ge=1)
+    # Days a listing shows released resources.
+    holdings_released_days: int = Field(default=14, ge=0)
     thread_title_chars: int = Field(default=60, ge=1)
     oidc_scope: str = "openid profile email"
     # Each call to the login provider, in seconds.

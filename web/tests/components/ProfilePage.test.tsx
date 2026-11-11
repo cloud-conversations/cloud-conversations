@@ -90,6 +90,15 @@ describe("the profile page", () => {
     );
   });
 
+  it("links an active experiment to its run in the chat", async () => {
+    show();
+
+    expect(await screen.findByRole("link", { name: "an A100 for a day" })).toHaveAttribute(
+      "href",
+      "/threads/t1#run-r1",
+    );
+  });
+
   it("releases an active experiment once confirmed", async () => {
     const asked = vi.spyOn(window, "confirm").mockReturnValue(true);
     const sent = show();

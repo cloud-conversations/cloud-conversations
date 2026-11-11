@@ -282,7 +282,7 @@ def _release_address(
         return True
     try:
         with audit.because(reason):
-            adapter.delete_floating_ip(site, address)
+            adapter.delete_floating_ip(site, address, allocated[0].idempotency_key)
     except Exception as exc:  # noqa: BLE001
         log.warning("could not release address %s: %s", address, exc)
         return False
@@ -680,7 +680,7 @@ def _release_all(run_id: uuid.UUID, adapter: TestbedAdapter) -> list[ReleaseOutc
                     adapter.delete_instance(r.site, r.provider_id)
                     adapter.wait_instance_gone(r.site, r.provider_id)
                 elif kind == "floating_ip":
-                    adapter.delete_floating_ip(r.site, r.provider_id)
+                    adapter.delete_floating_ip(r.site, r.provider_id, r.idempotency_key)
                 elif kind == "security_group":
                     adapter.delete_security_group(r.site, r.provider_id)
                 else:

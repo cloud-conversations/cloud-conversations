@@ -1,8 +1,8 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useMatch, useNavigate } from "react-router-dom";
 import { useCreateThread, useDeleteThread, useThreads } from "../hooks/useThreads";
 import { Failed } from "./Failed";
 
-const ACTIVITY = {
+export const ACTIVITY = {
   running: {
     dot: "bg-brand-success motion-safe:animate-pulse",
     says: "A build or a release is running in this chat.",
@@ -14,7 +14,7 @@ const ACTIVITY = {
 };
 
 export function ThreadSidebar({ width }: { width: number }) {
-  const { threadId } = useParams();
+  const threadId = useMatch("/threads/:threadId")?.params.threadId;
   const { data: threads, isPending } = useThreads();
   const created = useCreateThread();
   const removed = useDeleteThread();
@@ -57,10 +57,8 @@ export function ThreadSidebar({ width }: { width: number }) {
         {threads?.map((thread) => (
           <div
             key={thread.thread_id}
-            className={`group flex items-center border-l-2 ${
-              thread.thread_id === threadId
-                ? "border-brand-info bg-brand-info/5"
-                : "border-transparent hover:bg-grey-lighter"
+            className={`group flex items-center mx-2 rounded-md ${
+              thread.thread_id === threadId ? "bg-grey-light" : "hover:bg-grey-lighter"
             }`}
           >
             <span className="w-2 ml-2 flex-shrink-0">
@@ -75,6 +73,7 @@ export function ThreadSidebar({ width }: { width: number }) {
             </span>
             <Link
               to={`/threads/${thread.thread_id}`}
+              aria-current={thread.thread_id === threadId ? "page" : undefined}
               className={`flex-1 min-w-0 px-2 py-2 text-sm truncate ${
                 thread.thread_id === threadId ? "text-grey-dark" : "text-grey"
               }`}
