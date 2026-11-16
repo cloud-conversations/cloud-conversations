@@ -111,6 +111,12 @@ def test_a_reply_of_two_objects_is_told_which_it_sent():
     ]
 
 
+def test_a_reply_with_a_stray_brace_is_told_to_remove_it():
+    _, rounds, _, _ = _run([answer_reply() + "}", search_reply(), answer_reply()])
+
+    assert rounds[0].reasons == ["the reply has text after its JSON object: '}'; remove it"]
+
+
 def test_a_repository_the_user_did_not_give_is_not_read():
     read = json.dumps({"action": "read_repository", "url": REPOSITORY})
     _, rounds, _, _ = _run([read, search_reply(), answer_reply()])

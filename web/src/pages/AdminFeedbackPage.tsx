@@ -76,6 +76,19 @@ export function AdminFeedbackPage() {
           </dl>
         </Section>
 
+        <Section title="The chat">
+          <ol className="space-y-2">
+            {f.messages.map((m) => (
+              <li key={m.message_id}>
+                <p className="text-grey">
+                  {m.role}, {m.kind}
+                </p>
+                <pre className={PRE}>{m.text}</pre>
+              </li>
+            ))}
+          </ol>
+        </Section>
+
         {f.message_kind && (
           <Section title={`The ${f.message_kind} rated`}>
             <pre className={PRE}>{f.message_text}</pre>

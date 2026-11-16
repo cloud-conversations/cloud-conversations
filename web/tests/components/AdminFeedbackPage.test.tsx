@@ -50,27 +50,52 @@ const DETAIL = {
   run_state: null,
   run_failure: null,
   build_turns: [],
+  messages: [
+    {
+      message_id: "m0",
+      role: "user",
+      kind: "user",
+      text: "how do I reserve a node? I want one for a week",
+      payload: {},
+      description_id: null,
+      description_version: null,
+      created_at: "2026-10-01T09:59:00Z",
+    },
+  ],
 };
 
 afterEach(() => vi.unstubAllGlobals());
 
+function renderPage() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true, status: 200, json: async () => DETAIL })),
+  );
+  render(
+    <MemoryRouter initialEntries={[`/admin/feedback/${DETAIL.feedback_id}`]}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <Routes>
+          <Route path="/admin/feedback/:feedbackId" element={<AdminFeedbackPage />} />
+        </Routes>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+}
+
 describe("a piece of feedback's admin page", () => {
+  it("shows every message in the chat", async () => {
+    renderPage();
+
+    const chat = (await screen.findByText("The chat")).closest("section") as HTMLElement;
+    expect([...chat.querySelectorAll("pre")].map((p) => p.textContent)).toEqual([
+      "how do I reserve a node? I want one for a week",
+    ]);
+  });
+
   it("shows what the model was sent each round, and what it replied", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ ok: true, status: 200, json: async () => DETAIL })),
-    );
-    render(
-      <MemoryRouter initialEntries={[`/admin/feedback/${DETAIL.feedback_id}`]}>
-        <QueryClientProvider
-          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-        >
-          <Routes>
-            <Route path="/admin/feedback/:feedbackId" element={<AdminFeedbackPage />} />
-          </Routes>
-        </QueryClientProvider>
-      </MemoryRouter>,
-    );
+    renderPage();
 
     const round = (await screen.findByText("Round 1: answer")).closest("li") as HTMLElement;
     expect([...round.querySelectorAll("pre")].map((p) => p.textContent)).toEqual([

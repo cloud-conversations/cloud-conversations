@@ -319,6 +319,7 @@ export interface FeedbackDetail extends ListedFeedback {
   requirements: Record<string, unknown> | null;
   rubric: Record<string, unknown>[] | null;
   build_turns: Round[];
+  messages: Message[];
 }
 
 export interface FeedbackPage {

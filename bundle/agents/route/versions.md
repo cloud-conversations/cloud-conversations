@@ -9,3 +9,5 @@
 
 Asking to build or run a version already described is build. Changing anything
 about it first is revise.
+Asking to install software or clone a repository onto the machine described, even
+as a question, is revise.

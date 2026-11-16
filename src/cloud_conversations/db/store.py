@@ -177,6 +177,7 @@ class FeedbackDetail(ListedFeedback):
     rubric: list[dict[str, Any]] | None
     # The run's build-agent turns, each with what it was sent.
     build_turns: list[dict[str, Any]]
+    messages: list[Message]
 
 
 @dataclass
@@ -1899,7 +1900,15 @@ def feedback_detail(feedback_id: uuid.UUID) -> FeedbackDetail:
             "ORDER BY seq",
             [row["run_id"]],
         ).fetchall()
-    return FeedbackDetail(**row, build_turns=[t["turn"] for t in turns])
+        messages = conn.execute(
+            "SELECT * FROM chat.messages WHERE thread_id = %s ORDER BY seq",
+            [row["thread_id"]],
+        ).fetchall()
+    return FeedbackDetail(
+        **row,
+        build_turns=[t["turn"] for t in turns],
+        messages=[_row_to_message(m) for m in messages],
+    )
 
 
 def enqueue_job(
