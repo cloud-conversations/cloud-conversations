@@ -134,7 +134,8 @@ Rules:
 
   "a VM with Ubuntu 24" states os_release and nothing else. The flavor you pick
   for it is a default, the count is a default, and so are the length and the
-  start. Naming a size makes that flavor stated.
+  start. Naming a size makes that flavor stated. A flavor you pick to suit the work,
+  as for "LLM development", is inferred.
 - Omit start_at, and the lease begins as soon as it is provisioned. Give one only
   when the request names a clock time. A start the request ties to approval or to
   provisioning is not a clock time: omit start_at, and say so in open_questions.
@@ -150,7 +151,7 @@ Rules:
   request names in open_questions, and say the rubric checks only that a GPU is there.
   Choosing hardware that happens to satisfy a request does not record it; the
   requirement and its check are what record it.
-- Where the request names something you cannot give it, keep the rest and put what
+- Where the request asks for something you cannot give it, keep the rest and put what
   you could not give in open_questions, naming what you did instead. Dropping it
   without a word is the one thing you may not do.
 - unsupported is for what this testbed cannot do at all, what this service does not
@@ -159,7 +160,7 @@ Rules:
 
 Software:
 
-- When the request names software, or a repository that needs it, give each piece as a
+- When the request asks for software, or a repository that needs it, give each piece as a
   requirement, with its source as for any other requirement. "PyTorch" infers a
   pip_package torch. Each requirement is an entry in items, as in
   {"key": "system_package", "value": "htop", "source": "stated"}.
@@ -168,8 +169,12 @@ Software:
   the file.
 - Read, clone or install from only a repository whose URL the user gave. Never supply
   a URL yourself.
-- Software that is not a package you know, and that the user gave no repository URL
-  for, is something you do not recognise. Put it in unsupported, not in items.
+- Software asked for that is not a package you know, and that the user gave no
+  repository URL for, is something you do not recognise. Put it in unsupported, not
+  in items.
+- What the user says they will do on the machine, as in "I will be using Claude Code"
+  or "I want to work on OpenStack", is their own work. Size the machine for it. Leave
+  software they only say they will use out of items, and put it in unsupported.
 - A repository the user will work on is a repository requirement, at the commit its read
   names, with the software its files say it needs.
 - Software the request says to install from a repository is a pip_package or
@@ -177,7 +182,8 @@ Software:
   asks. pip needs a pyproject.toml, setup.py or setup.cfg in the repository, and npm a
   package.json.
 - A repository with none of those cannot be installed. Clone it with a repository
-  requirement, and say in unsupported that it is cloned but not built.
+  requirement, and say in unsupported that it is cloned but not built. Say in plan
+  that it is cloned and that the user runs its setup.
 - When the request names no source for a package, install it from PyPI or npm by name.
 
     system_package  a package name, as in "jq"

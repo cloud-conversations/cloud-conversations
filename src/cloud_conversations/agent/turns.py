@@ -84,8 +84,11 @@ class Turn(Generic[T_co]):
 def faults(exc: ValueError) -> list[str]:
     """What is wrong with a reply, one line for each fault."""
     if isinstance(exc, json.JSONDecodeError) and exc.msg == "Extra data":
-        sent = ", ".join(_actions(exc.doc))
-        return [f"the reply holds more than one JSON object ({sent}); send one"]
+        sent = _actions(exc.doc)
+        if len(sent) == 1:
+            extra = exc.doc[exc.pos:].strip()
+            return [f"the reply has text after its JSON object: {extra!r}; remove it"]
+        return [f"the reply holds more than one JSON object ({', '.join(sent)}); send one"]
     if not isinstance(exc, ValidationError):
         return [str(exc)]
     lines = []

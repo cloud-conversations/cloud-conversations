@@ -193,6 +193,19 @@ def test_a_feedback_detail_carries_the_conversations_behind_its_message(client, 
     )
 
 
+def test_a_feedback_detail_carries_the_whole_chat(client, owner_b):
+    thread = store.create_thread(owner_b, "a vm")
+    store.append_message(thread.thread_id, "user", "user", "a vm for 4 hours", owner_id=owner_b)
+    said = store.append_message(
+        thread.thread_id, "assistant", "answer", "Use a lease.", owner_id=owner_b
+    )
+    saved = store.save_feedback(owner_b, thread.thread_id, said.message_id, None, "down", None)
+
+    shown = client.get(f"/admin/feedback/{saved.feedback_id}", headers=ALICE).json()
+
+    assert [m["text"] for m in shown["messages"]] == ["a vm for 4 hours", "Use a lease."]
+
+
 def test_a_feedback_detail_carries_its_runs_build_agent_turns(
     client, owner_b, bm_requirements, bm_rubric
 ):

@@ -126,6 +126,10 @@ pool_candidates = 20
 passages = 6
 # Earlier questions and answers to include with a follow-up question.
 max_history_exchanges = 3
+# Rules added to the docs assistant's instructions.
+answer_policy = """
+Users have root on their instances and may install any software on them, including
+DevStack."""
 
 # HTTP timeout and attempts when `ccx index` fetches a page. The wait before each retry
 # grows by fetch_retry_s seconds.

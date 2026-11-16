@@ -94,6 +94,7 @@ class FeedbackDetailOut(ListedFeedbackOut):
     rubric: list[dict[str, Any]] | None
     # The run's build-agent turns, each with what it was sent.
     build_turns: list[dict[str, Any]]
+    messages: list[MessageOut]
 
 
 class FeedbackPage(BaseModel):
